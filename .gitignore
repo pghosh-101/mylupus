@@ -30,8 +30,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files (API keys) - ignore every variant, keep only the blank template
+.env*
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -41,4 +42,3 @@ example
 # generated native folders
 /ios
 /android
-.env
