@@ -130,19 +130,18 @@ export function UvCard() {
   return (
     <Card>
       <View style={styles.headerRow}>
-        <Pressable onPress={() => setPicking(true)} hitSlop={12} style={styles.placeButton}>
-          <ThemedText type="smallBold" themeColor="textSecondary" numberOfLines={1}>
-            UV INDEX · {placeLabel.toUpperCase()}
+        <View style={styles.placeName}>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            UV INDEX
           </ThemedText>
-          <ThemedText type="small" style={{ color: theme.accent }}>
-            Change
+          <ThemedText type="smallBold" numberOfLines={1}>
+            {placeLabel}
           </ThemedText>
-        </Pressable>
-        <Pressable onPress={load} hitSlop={12}>
-          <ThemedText type="small" style={{ color: theme.accent }}>
-            Refresh
-          </ThemedText>
-        </Pressable>
+        </View>
+        <View style={styles.pillRow}>
+          <Pill label="Change" onPress={() => setPicking(true)} />
+          <Pill label="Refresh" onPress={load} />
+        </View>
       </View>
 
       <View style={styles.nowRow}>
@@ -292,6 +291,24 @@ function CityPicker({
   );
 }
 
+/** Small rounded text button with a comfortable tap area. */
+function Pill({ label, onPress }: { label: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={4}
+      style={({ pressed }) => [
+        styles.pill,
+        { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 },
+      ]}>
+      <ThemedText type="smallBold" style={{ color: theme.accent }}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 function Button({
   label,
   onPress,
@@ -316,7 +333,9 @@ function Button({
 const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.two },
-  placeButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexShrink: 1 },
+  pillRow: { flexDirection: 'row', gap: Spacing.three },
+  placeName: { flex: 1 },
+  pill: { paddingVertical: Spacing.one + 2, paddingHorizontal: Spacing.three, borderRadius: 999 },
   nowRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   bigNumber: { fontSize: 56, lineHeight: 64, fontWeight: '700' },
   nowText: { flex: 1, gap: Spacing.half },
