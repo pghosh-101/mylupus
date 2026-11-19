@@ -34,18 +34,16 @@ export async function requestNotificationPermission(): Promise<PermissionState> 
 
 const fmt = (uv: number) => uv.toFixed(1);
 
-/** The wording of the morning notification. */
+/** The wording of the morning notification. Kept short so iOS doesn't cut it off. */
 export function morningMessage(day: DayProjection): { title: string; body: string } {
   const limit = Settings.uvThreshold;
-  const now = `Right now the UV is about ${fmt(day.atAlertHour)}`;
-  const rest = day.window
-    ? `and it's projected to rise to a max of ${fmt(day.max)} around ${formatHour(day.peakHour)}. ` +
-      `It'll be above your limit of ${limit} from ${formatHour(day.window.start)} to ${formatHour(day.window.end)}, so plan sunscreen for then.`
-    : `and it's projected to peak at ${fmt(day.max)} around ${formatHour(day.peakHour)}, staying within your limit of ${limit} all day.`;
-  return {
-    title: `Good morning, ${Settings.name}`,
-    body: `Hope you slept well. ${now}, ${rest}`,
-  };
+  const parts = [`UV now ${fmt(day.atAlertHour)}`, `max ${fmt(day.max)} at ${formatHour(day.peakHour)}`];
+  parts.push(
+    day.window
+      ? `above ${limit} from ${formatHour(day.window.start)}–${formatHour(day.window.end)}`
+      : `within your limit all day`,
+  );
+  return { title: `Good morning, ${Settings.name}`, body: parts.join(' · ') };
 }
 
 /** Local Date for the alert time on a "YYYY-MM-DD" date, in the phone's time zone. */
