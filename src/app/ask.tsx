@@ -41,8 +41,11 @@ const STARTERS = [
   'What foods are generally recommended for lupus?',
 ];
 
-/** Height of the iPhone tab bar above the home-indicator area. */
-const TAB_BAR_HEIGHT = Platform.select({ ios: 56, android: 64, default: 0 });
+/**
+ * Extra space to keep the input clear of the tab bar, on top of the bottom safe-area inset.
+ * Tuned on iPhone (floating tab bar): this leaves a small gap right above the tabs.
+ */
+const TAB_BAR_CLEARANCE = Platform.select({ ios: 10, android: 72, default: 0 });
 
 export default function AskScreen() {
   const theme = useTheme();
@@ -62,7 +65,7 @@ export default function AskScreen() {
       hide.remove();
     };
   }, []);
-  const inputBottom = keyboardUp ? Spacing.two : insets.bottom + TAB_BAR_HEIGHT + Spacing.two;
+  const inputBottom = keyboardUp ? Spacing.two : insets.bottom + TAB_BAR_CLEARANCE;
 
   useFocusEffect(
     useCallback(() => {
