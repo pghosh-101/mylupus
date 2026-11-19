@@ -9,7 +9,11 @@ import { LAB_TESTS } from '@/lib/labs';
 const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
 export const hasAiKey = Boolean(API_KEY);
 
-export const AI_MODEL = 'claude-opus-5-5';
+/**
+ * Reading numbers off a report is a simple transcription task, and every result is reviewed
+ * before saving, so it uses the cheapest current model.
+ */
+export const SCAN_MODEL = 'claude-haiku-5-5';
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -99,12 +103,9 @@ Rules:
 - notes: a short plain-language note about anything skipped or uncertain, or "" if nothing.`;
 
 export async function readLabReport(images: ReportImage[]): Promise<{ results: ExtractedResult[]; notes: string }> {
-  const response = await getClient().beta.messages.create({
-    model: AI_MODEL,
+  const response = await getClient().messages.create({
+    model: SCAN_MODEL,
     max_tokens: 16000,
-    // If a safety classifier declines, let the API retry on a fallback model automatically.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
     output_config: {
       effort: 'medium',
       format: { type: 'json_schema', schema: EXTRACTION_SCHEMA },
