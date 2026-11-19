@@ -12,7 +12,6 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   byTest,
-  changeSinceLast,
   displayStatus,
   formatValue,
   LAB_TESTS,
@@ -205,7 +204,7 @@ export default function LabsScreen() {
   );
 }
 
-/** One lab in the list: name, change since last test, latest value, and where it sits in the range. */
+/** One lab in the list: name, latest value, and where it sits in the normal range. Details are a tap away. */
 function TestRow({
   name,
   results,
@@ -219,18 +218,14 @@ function TestRow({
 }) {
   const theme = useTheme();
   const latest = results[results.length - 1];
-  const change = changeSinceLast(results);
   const label = rangeLabel(latest);
   // Orange when out of range (unless the doctor said it's OK and it isn't getting worse).
   const statusColor = displayStatus(results, note).tone === 'alert' ? theme.sunAlert : theme.textSecondary;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { borderColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 }]}>
-      <View style={styles.flex}>
-        <ThemedText type="smallBold">{name}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {change ?? '1 result'}
-        </ThemedText>
-      </View>
+      <ThemedText type="smallBold" style={styles.flex}>
+        {name}
+      </ThemedText>
       <View style={styles.right}>
         <ThemedText type="smallBold">
           {formatValue(latest.value)} <ThemedText type="small" themeColor="textSecondary">{latest.unit}</ThemedText>

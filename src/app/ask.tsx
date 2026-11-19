@@ -73,6 +73,7 @@ export default function AskScreen() {
   const send = async (text: string) => {
     const question = text.trim();
     if (!question || sending) return;
+    Keyboard.dismiss();
     setDraft('');
     setSending(true);
     // Show the question immediately.
@@ -134,6 +135,8 @@ export default function AskScreen() {
           style={styles.flex}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          // Swipe down on the conversation to put the keyboard away.
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           <View style={styles.inner}>
             {!hasAiKey ? (
@@ -232,6 +235,17 @@ export default function AskScreen() {
               styles.inputBar,
               { borderColor: theme.backgroundSelected, backgroundColor: theme.background, paddingBottom: inputBottom },
             ]}>
+            {keyboardUp && (
+              <Pressable
+                onPress={() => Keyboard.dismiss()}
+                accessibilityLabel="Hide keyboard"
+                hitSlop={6}
+                style={[styles.hide, { backgroundColor: theme.backgroundSelected }]}>
+                <ThemedText type="smallBold" style={{ color: theme.accent, fontSize: 18, lineHeight: 20 }}>
+                  ⌄
+                </ThemedText>
+              </Pressable>
+            )}
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -296,5 +310,6 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.two + 2,
     fontSize: 16,
   },
+  hide: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   send: { borderRadius: 18, paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three },
 });
