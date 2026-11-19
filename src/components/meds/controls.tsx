@@ -297,3 +297,27 @@ const chipStyles = StyleSheet.create({
   title: { flex: 1, textAlign: 'center' },
   body: { padding: Spacing.three, gap: Spacing.four, paddingBottom: Spacing.six },
 });
+
+/** Day stepper for "YYYY-MM-DD" values; can't go past today. Hold-free: ±1 day, ±1 month buttons. */
+export function DayStepper({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const shift = (days: number, months = 0) => {
+    const [y, m, d] = value.split('-').map(Number);
+    const next = new Date(y, m - 1 + months, d + days);
+    const today = new Date();
+    if (next.getTime() > today.getTime()) return;
+    onChange(
+      `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`,
+    );
+  };
+  const [y, m, d] = value.split('-').map(Number);
+  const label = new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <Stepper label={label} onMinus={() => shift(-1)} onPlus={() => shift(1)} />
+      <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+        <ActionButton label="− 1 month" kind="secondary" onPress={() => shift(0, -1)} />
+        <ActionButton label="+ 1 month" kind="secondary" onPress={() => shift(0, 1)} />
+      </View>
+    </View>
+  );
+}
