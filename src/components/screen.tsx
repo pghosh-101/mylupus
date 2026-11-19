@@ -7,13 +7,20 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Standard scrollable page with a large title. */
-export function Screen({ title, children }: { title: string; children: ReactNode }) {
+export function Screen({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   const theme = useTheme();
   return (
     <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.inner}>
-          <ThemedText type="subtitle">{title}</ThemedText>
+          <View>
+            {subtitle ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                {subtitle}
+              </ThemedText>
+            ) : null}
+            <ThemedText type="subtitle">{title}</ThemedText>
+          </View>
           {children}
         </View>
       </ScrollView>

@@ -3,7 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { AppState, useColorScheme } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { LaunchOverlay } from '@/components/launch-overlay';
 import AppTabs from '@/components/app-tabs';
 import { scheduleEveningReminder } from '@/lib/daily';
 import { listenForDoseActions, rescheduleMedNotifications, setupDoseCategory } from '@/lib/meds';
@@ -31,7 +31,7 @@ export default function TabLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
+      <LaunchOverlay />
       <AppTabs />
     </ThemeProvider>
   );

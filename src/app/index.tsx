@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 
-import { Card, Screen } from '@/components/screen';
-import { ThemedText } from '@/components/themed-text';
 import { CheckinCard } from '@/components/log/checkin-cards';
 import { MorningAlertCard } from '@/components/morning-alert-card';
+import { Card, Screen } from '@/components/screen';
+import { ThemedText } from '@/components/themed-text';
+import { HeadsUpCard } from '@/components/today/heads-up-card';
+import { NextDoseCard } from '@/components/today/next-dose-card';
 import { UvCard } from '@/components/uv-card';
+import { Settings } from '@/lib/settings';
 
 function greeting() {
   const h = new Date().getHours();
@@ -16,11 +19,17 @@ function greeting() {
 export default function TodayScreen() {
   // Set after mount so the pre-rendered web page and the live clock never disagree.
   const [title, setTitle] = useState('Today');
-  useEffect(() => setTitle(greeting()), []);
+  const [date, setDate] = useState('');
+  useEffect(() => {
+    setTitle(`${greeting()}, ${Settings.name}`);
+    setDate(new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }));
+  }, []);
 
   return (
-    <Screen title={title}>
+    <Screen title={title} subtitle={date}>
+      <NextDoseCard />
       <CheckinCard compact />
+      <HeadsUpCard />
       <UvCard />
       <MorningAlertCard />
       <Card>
