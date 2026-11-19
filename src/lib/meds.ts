@@ -289,74 +289,204 @@ export function formatPlanMinutes(m: Minutes): string {
   return formatMinutes(wrap(m)) + (m >= DAY ? ' (after midnight)' : '');
 }
 
-/**
- * Today's doses with later ones pushed back as needed:
- * - at least `spacingHours` from other medications (the larger of the two meds' settings),
- * - empty-stomach doses at least 2 hours after a with-food dose (that dose marks a meal),
- * - with-food doses at least 1 hour after an empty-stomach dose,
- * - repeat doses of the same medication keep their usual gap (up to 1 hour shorter).
- * Doses are never moved earlier than scheduled.
- */
-export function planDay(meds: Medication[], log: DoseLogEntry[], date: string): PlannedDose[] {
-  const midnight = parseDate(date).getTime();
-  const doses: PlannedDose[] = meds
-    .flatMap((med) =>
-      med.doseTimes.map((t, i) => {
-        const key = doseKey(date, med.id, i);
-        const entry = log.find((e) => e.key === key) ?? null;
-        return {
-          med,
-          doseIndex: i,
-          key,
-          scheduled: t,
-          planned: t,
-          reason: null,
-          entry,
-          takenAt: entry?.status === 'taken' ? Math.round((entry.at - midnight) / 60000) : null,
-        };
-      }),
-    )
-    .sort((a, b) => a.scheduled - b.scheduled);
+// ---------------------------------------------------------------------------
+// Routine events (wake up, meals) that you can log, so the day adjusts around them
+// ---------------------------------------------------------------------------
 
-  // Earlier events constrain later pending doses. Skipped doses don't count.
-  const events: { med: Medication; scheduled: Minutes; time: Minutes }[] = [];
-  for (const d of doses) {
+export type RoutineEvent = 'wake' | 'breakfast' | 'lunch' | 'dinner';
+export const ROUTINE_EVENTS: RoutineEvent[] = ['wake', 'breakfast', 'lunch', 'dinner'];
+export const ROUTINE_LABEL: Record<RoutineEvent, string> = {
+  wake: 'Wake up',
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+};
+const MEALS: RoutineEvent[] = ['breakfast', 'lunch', 'dinner'];
+
+export type RoutineLogEntry = { key: string; status: 'done' | 'skipped'; at: number };
+const ROUTINE_LOG_KEY = 'mylupus.routineLog';
+export const routineKey = (date: string, event: RoutineEvent) => `${date}|${event}`;
+export const loadRoutineLog = () => readJSON<RoutineLogEntry[]>(ROUTINE_LOG_KEY, []);
+
+export async function logRoutine(key: string, status: 'done' | 'skipped', at = Date.now()) {
+  if (status === 'done') success();
+  const log = await loadRoutineLog();
+  const next = log.filter((e) => e.key !== key);
+  next.push({ key, status, at });
+  await writeJSON(ROUTINE_LOG_KEY, next.slice(-3000));
+}
+
+export async function undoRoutine(key: string) {
+  const log = await loadRoutineLog();
+  await writeJSON(
+    ROUTINE_LOG_KEY,
+    log.filter((e) => e.key !== key),
+  );
+}
+
+export type PlannedRoutine = {
+  kind: 'routine';
+  event: RoutineEvent;
+  key: string;
+  scheduled: Minutes;
+  planned: Minutes;
+  reason: string | null;
+  entry: RoutineLogEntry | null;
+};
+
+export type TimelineItem = (PlannedDose & { kind: 'dose' }) | PlannedRoutine;
+
+const round5 = (m: number) => Math.ceil(m / 5) * 5;
+const hoursText = (min: number) => {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`;
+};
+
+/**
+ * The day's doses and routine events, with pending items pushed later (never earlier) based on
+ * what actually happened:
+ * - Waking up later than usual shifts the morning (items within 4 h of your usual wake time) by the
+ *   same amount; later items move only as the other rules require.
+ * - A meal waits at least min(usual gap, 3 h) after the previous meal, and 1 h after an
+ *   empty-stomach dose.
+ * - With-food doses line up with their meal (one scheduled within 90 min of the dose).
+ * - Empty-stomach doses wait 2 h after a logged meal or a with-food dose.
+ * - Doses keep `spacingHours` from other medications, and repeat doses of the same medication keep
+ *   their usual gap (up to 1 h shorter).
+ * Without a routine, only the dose rules apply.
+ */
+export function planTimeline(
+  meds: Medication[],
+  log: DoseLogEntry[],
+  date: string,
+  routine?: Routine,
+  routineLog: RoutineLogEntry[] = [],
+): TimelineItem[] {
+  const midnight = parseDate(date).getTime();
+  const toMinutes = (at: number) => Math.round((at - midnight) / 60000);
+
+  const doses: TimelineItem[] = meds.flatMap((med) =>
+    med.doseTimes.map((t, i) => {
+      const key = doseKey(date, med.id, i);
+      const entry = log.find((e) => e.key === key) ?? null;
+      return {
+        kind: 'dose' as const,
+        med,
+        doseIndex: i,
+        key,
+        scheduled: t,
+        planned: t,
+        reason: null,
+        entry,
+        takenAt: entry?.status === 'taken' ? toMinutes(entry.at) : null,
+      };
+    }),
+  );
+  const routineItems: TimelineItem[] = routine
+    ? ROUTINE_EVENTS.map((event) => {
+        const key = routineKey(date, event);
+        return {
+          kind: 'routine' as const,
+          event,
+          key,
+          scheduled: routine[event],
+          planned: routine[event],
+          reason: null,
+          entry: routineLog.find((e) => e.key === key) ?? null,
+        };
+      })
+    : [];
+  // Routine events come first when times tie, so a meal is placed before its with-food dose.
+  const items = [...routineItems, ...doses].sort(
+    (a, b) => a.scheduled - b.scheduled || (a.kind === 'routine' ? -1 : 1) - (b.kind === 'routine' ? -1 : 1),
+  );
+
+  let wakeShift = 0;
+  /** Only the morning moves with a late wake-up; the rest of the day follows the other rules. */
+  const inMorning = (scheduled: Minutes) => (routine ? scheduled < routine.wake + 240 : false);
+  let lastMeal: { event: RoutineEvent; scheduled: Minutes; time: Minutes; logged: boolean } | null = null;
+  let lastEmptyDose: { med: Medication; time: Minutes } | null = null;
+  const doseEvents: { med: Medication; scheduled: Minutes; time: Minutes }[] = [];
+  const mealTimes = new Map<RoutineEvent, Minutes>();
+
+  const push = (item: TimelineItem, earliest: number, why: string) => {
+    if (earliest > item.planned) {
+      item.planned = round5(earliest);
+      item.reason = why;
+    }
+  };
+
+  for (const item of items) {
+    if (item.kind === 'routine') {
+      if (item.entry?.status === 'skipped') continue;
+      const done = item.entry?.status === 'done';
+      if (done) item.planned = toMinutes(item.entry!.at);
+
+      if (item.event === 'wake') {
+        if (done) wakeShift = Math.max(0, item.planned - item.scheduled);
+        continue;
+      }
+      if (!done) {
+        if (wakeShift && inMorning(item.scheduled)) push(item, item.scheduled + wakeShift, `You woke up ${hoursText(wakeShift)} later`);
+        if (lastMeal) {
+          const gap = Math.min(item.scheduled - lastMeal.scheduled, 180);
+          push(item, lastMeal.time + gap, `${hoursText(gap)} after ${ROUTINE_LABEL[lastMeal.event].toLowerCase()}`);
+        }
+        if (lastEmptyDose) push(item, lastEmptyDose.time + 60, `1 hour after ${shortName(lastEmptyDose.med.name)}`);
+      }
+      lastMeal = { event: item.event, scheduled: item.scheduled, time: item.planned, logged: done };
+      mealTimes.set(item.event, item.planned);
+      continue;
+    }
+
+    // Doses
+    const d = item;
     if (d.entry?.status === 'skipped') continue;
     if (d.takenAt !== null) {
       d.planned = d.takenAt;
-      events.push({ med: d.med, scheduled: d.scheduled, time: d.takenAt });
-      continue;
-    }
-    for (const e of events) {
-      let earliest = 0;
-      let why = '';
-      const name = shortName(e.med.name);
-      if (e.med.id === d.med.id) {
-        earliest = e.time + (d.scheduled - e.scheduled) - 60;
-        why = `Keeps about ${Math.round((d.scheduled - e.scheduled) / 60)} hours after your last dose`;
-      } else {
+    } else {
+      if (wakeShift && inMorning(d.scheduled)) push(d, d.scheduled + wakeShift, `You woke up ${hoursText(wakeShift)} later`);
+      for (const e of doseEvents) {
+        const name = shortName(e.med.name);
+        if (e.med.id === d.med.id) {
+          push(d, e.time + (d.scheduled - e.scheduled) - 60, `Keeps about ${Math.round((d.scheduled - e.scheduled) / 60)} hours after your last dose`);
+          continue;
+        }
         const gap = Math.max(d.med.spacingHours ?? 0, e.med.spacingHours ?? 0) * 60;
-        if (gap > 0 && e.time + gap > earliest) {
-          earliest = e.time + gap;
-          why = `${gap / 60} hours after ${name}`;
-        }
-        if (d.med.foodRule === 'empty_stomach' && e.med.foodRule === 'with_food' && e.time + 120 >= earliest) {
-          earliest = e.time + 120;
-          why = `2 hours after ${name} and food`;
-        }
-        if (d.med.foodRule === 'with_food' && e.med.foodRule === 'empty_stomach' && e.time + 60 >= earliest) {
-          earliest = e.time + 60;
-          why = `1 hour after ${name} (empty stomach)`;
-        }
+        if (gap > 0) push(d, e.time + gap, `${gap / 60} hours after ${name}`);
+        if (d.med.foodRule === 'empty_stomach' && e.med.foodRule === 'with_food') push(d, e.time + 120, `2 hours after ${name} and food`);
+        if (d.med.foodRule === 'with_food' && e.med.foodRule === 'empty_stomach') push(d, e.time + 60, `1 hour after ${name} (empty stomach)`);
       }
-      if (earliest > d.planned) {
-        d.planned = Math.ceil(earliest / 5) * 5;
-        d.reason = why;
+      if (d.med.foodRule === 'empty_stomach' && lastMeal?.logged) {
+        push(d, lastMeal.time + 120, `2 hours after ${ROUTINE_LABEL[lastMeal.event].toLowerCase()}`);
+      }
+      if (d.med.foodRule === 'with_food' && routine) {
+        // Line up with the meal scheduled closest to this dose (within 90 minutes).
+        const meal = MEALS.map((m) => ({ m, diff: Math.abs(routine[m] - d.scheduled) }))
+          .filter((x) => x.diff <= 90)
+          .sort((a, b) => a.diff - b.diff)[0]?.m;
+        const mealTime = meal ? mealTimes.get(meal) : undefined;
+        if (meal && mealTime !== undefined) push(d, mealTime, `With ${ROUTINE_LABEL[meal].toLowerCase()}`);
       }
     }
-    events.push({ med: d.med, scheduled: d.scheduled, time: d.planned });
+    doseEvents.push({ med: d.med, scheduled: d.scheduled, time: d.planned });
+    if (d.med.foodRule === 'empty_stomach') lastEmptyDose = { med: d.med, time: d.planned };
   }
-  return doses;
+  return items;
+}
+
+/** The day's doses (see planTimeline for the rules). */
+export function planDay(
+  meds: Medication[],
+  log: DoseLogEntry[],
+  date: string,
+  routine?: Routine,
+  routineLog?: RoutineLogEntry[],
+): PlannedDose[] {
+  return planTimeline(meds, log, date, routine, routineLog).filter(
+    (i): i is PlannedDose & { kind: 'dose' } => i.kind === 'dose',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +550,7 @@ export async function rescheduleMedNotifications(meds?: Medication[]) {
   if (permission === 'undetermined') permission = await requestNotificationPermission();
   if (permission !== 'granted') return;
 
-  const log = await loadDoseLog();
+  const [log, routine, routineLog] = await Promise.all([loadDoseLog(), loadRoutine(), loadRoutineLog()]);
   const perDay = meds.reduce((n, m) => n + m.doseTimes.length, 0) || 1;
   const days = Math.max(1, Math.min(14, Math.floor(MAX_DOSE_NOTIFICATIONS / perDay)));
   const now = Date.now();
@@ -430,7 +560,7 @@ export async function rescheduleMedNotifications(meds?: Medication[]) {
     day.setDate(day.getDate() + offset);
     const date = todayString(day);
     const midnight = parseDate(date).getTime();
-    for (const d of planDay(meds, log, date)) {
+    for (const d of planDay(meds, log, date, routine, routineLog)) {
       if (d.entry) continue; // already taken or skipped
       const when = midnight + d.planned * 60000;
       if (when <= now) continue;

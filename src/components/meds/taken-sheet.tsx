@@ -5,16 +5,17 @@ import { ActionButton, Segmented, TimeStepper } from '@/components/meds/controls
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { parseDate, shortName, type Minutes, type PlannedDose } from '@/lib/meds';
+import { parseDate, type Minutes } from '@/lib/meds';
 
-/** Asks what time a dose was actually taken. */
+/** Asks what time something happened (a dose taken, waking up, a meal). */
 export function TakenSheet({
-  dose,
+  prompt,
   date,
   onConfirm,
   onClose,
 }: {
-  dose: PlannedDose | null;
+  /** The question to show, e.g. "When did you take CellCept?". The sheet is open while this is set. */
+  prompt: string | null;
   /** The plan's day, "YYYY-MM-DD". */
   date: string;
   onConfirm: (takenAt: number) => void;
@@ -29,11 +30,11 @@ export function TakenSheet({
   const [quick, setQuick] = useState<number>(0);
 
   useEffect(() => {
-    if (dose) {
+    if (prompt) {
       setTime(nowMinutes());
       setQuick(0);
     }
-  }, [dose]);
+  }, [prompt]);
 
   const pickQuick = (minutesAgo: number) => {
     setQuick(minutesAgo);
@@ -50,12 +51,12 @@ export function TakenSheet({
   };
 
   return (
-    <Modal visible={dose !== null} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={prompt !== null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.sheet, { backgroundColor: theme.backgroundElement }]} onPress={() => {}}>
-          {dose && (
+          {prompt && (
             <>
-              <ThemedText type="smallBold">When did you take {shortName(dose.med.name)}?</ThemedText>
+              <ThemedText type="smallBold">{prompt}</ThemedText>
               <Segmented
                 options={[
                   { value: 0, label: 'Now' },
@@ -77,7 +78,7 @@ export function TakenSheet({
                 />
               </View>
               <ThemedText type="small" themeColor="textSecondary">
-                Later doses today adjust to keep the right spacing and food timing.
+                The rest of today adjusts to keep the right spacing and food timing.
               </ThemedText>
               <View style={styles.row}>
                 <View style={styles.flex}>

@@ -15,6 +15,8 @@ import {
   formatPlanMinutes,
   loadDoseLog,
   loadMeds,
+  loadRoutine,
+  loadRoutineLog,
   logDose,
   planDay,
   rescheduleMedNotifications,
@@ -72,8 +74,8 @@ export function NextDoseCard() {
   const [now, setNow] = useState(() => new Date());
 
   const reload = useCallback(async () => {
-    const [meds, log] = await Promise.all([loadMeds(), loadDoseLog()]);
-    setDoses(meds.length ? planDay(meds, log, todayString()) : []);
+    const [meds, log, routine, routineLog] = await Promise.all([loadMeds(), loadDoseLog(), loadRoutine(), loadRoutineLog()]);
+    setDoses(meds.length ? planDay(meds, log, todayString(), routine, routineLog) : []);
     setNow(new Date());
   }, []);
 
@@ -145,7 +147,7 @@ export function NextDoseCard() {
       {next && <ActionButton label={`Took ${shortName(next.med.name)}`} onPress={() => setAsking(next)} />}
 
       <TakenSheet
-        dose={asking}
+        prompt={asking ? `When did you take ${shortName(asking.med.name)}?` : null}
         date={todayString()}
         onClose={() => setAsking(null)}
         onConfirm={async (at) => {
