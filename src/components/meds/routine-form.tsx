@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Field, TimeStepper } from '@/components/meds/controls';
+import { ActionButton, Field, TimeStepper } from '@/components/meds/controls';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -40,7 +40,9 @@ export function RoutineForm({
           <Pressable onPress={onClose} hitSlop={12}>
             <ThemedText style={{ color: theme.accent }}>Cancel</ThemedText>
           </Pressable>
-          <ThemedText type="smallBold">My routine</ThemedText>
+          <ThemedText type="smallBold" style={styles.title}>
+            My routine
+          </ThemedText>
           <Pressable onPress={() => onSave(draft)} hitSlop={12}>
             <ThemedText type="smallBold" style={{ color: theme.accent }}>
               Save
@@ -57,6 +59,7 @@ export function RoutineForm({
               <TimeStepper value={draft[f.key]} onChange={(m) => setDraft({ ...draft, [f.key]: m })} />
             </Field>
           ))}
+          <ActionButton label="Save routine" onPress={() => onSave(draft)} />
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -72,5 +75,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
+  title: { flex: 1, textAlign: 'center' },
   body: { padding: Spacing.three, gap: Spacing.four, paddingBottom: Spacing.six },
 });

@@ -101,7 +101,9 @@ export function MedForm({ visible, med, routine, onSave, onDelete, onClose }: Pr
           <Pressable onPress={onClose} hitSlop={12}>
             <ThemedText style={{ color: theme.accent }}>Cancel</ThemedText>
           </Pressable>
-          <ThemedText type="smallBold">{med ? 'Edit medication' : 'Add medication'}</ThemedText>
+          <ThemedText type="smallBold" numberOfLines={1} style={styles.title}>
+            {med ? 'Edit medication' : 'Add medication'}
+          </ThemedText>
           <Pressable onPress={save} hitSlop={12}>
             <ThemedText type="smallBold" style={{ color: theme.accent }}>
               Save
@@ -230,6 +232,7 @@ export function MedForm({ visible, med, routine, onSave, onDelete, onClose }: Pr
             )}
           </Field>
 
+          <ActionButton label={med ? 'Save changes' : 'Add medication'} onPress={save} />
           {med && <ActionButton label="Delete medication" kind="danger" onPress={confirmDelete} />}
         </ScrollView>
       </SafeAreaView>
@@ -246,6 +249,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
+  title: { flex: 1, textAlign: 'center' },
   body: { padding: Spacing.three, gap: Spacing.four, paddingBottom: Spacing.six },
   timeRow: { flexDirection: 'row', gap: Spacing.three, alignItems: 'flex-start' },
   doseLabel: { width: 52, paddingTop: 10 },
