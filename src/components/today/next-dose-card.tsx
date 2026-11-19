@@ -7,7 +7,7 @@ import { ActionButton } from '@/components/meds/controls';
 import { TakenSheet } from '@/components/meds/taken-sheet';
 import { Card } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { HeadingFont, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   FOOD_RULE_HINT,
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   body: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   flex: { flex: 1, gap: 2 },
-  medName: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
+  medName: { fontSize: 20, lineHeight: 26, fontFamily: HeadingFont.bold },
   ring: { width: 64, height: 64 },
   ringLabel: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
 });

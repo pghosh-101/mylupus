@@ -126,7 +126,7 @@ export default function AskScreen() {
           <ThemedText type="subtitle">Ask MyLupus</ThemedText>
           {messages.length > 0 && (
             <Pressable onPress={newChat} hitSlop={10} style={[styles.newChat, { backgroundColor: theme.backgroundSelected }]}>
-              <ThemedText type="smallBold" style={{ color: theme.accent }}>
+              <ThemedText type="button" style={{ color: theme.accent }}>
                 New chat
               </ThemedText>
             </Pressable>
@@ -261,7 +261,7 @@ export default function AskScreen() {
               onPress={() => send(draft)}
               disabled={!draft.trim() || sending}
               style={[styles.send, { backgroundColor: theme.accent, opacity: !draft.trim() || sending ? 0.4 : 1 }]}>
-              <ThemedText type="smallBold" style={{ color: theme.onAccent }}>
+              <ThemedText type="button" style={{ color: theme.onAccent }}>
                 Send
               </ThemedText>
             </Pressable>

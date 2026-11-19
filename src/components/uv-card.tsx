@@ -4,7 +4,7 @@ import { ActivityIndicator, AppState, Pressable, StyleSheet, TextInput, View } f
 import { Card } from '@/components/screen';
 import { SunscreenRow } from '@/components/sunscreen-row';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { HeadingFont, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   distanceKm,
@@ -398,7 +398,7 @@ function Pill({ label, onPress }: { label: string; onPress: () => void }) {
         styles.pill,
         { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 },
       ]}>
-      <ThemedText type="smallBold" style={{ color: theme.accent }}>
+      <ThemedText type="button" style={{ color: theme.accent }}>
         {label}
       </ThemedText>
     </Pressable>
@@ -419,7 +419,7 @@ function Button({
     <Pressable
       onPress={onPress}
       style={[styles.button, { backgroundColor: secondary ? theme.backgroundSelected : theme.accent }]}>
-      <ThemedText type="smallBold" style={{ color: secondary ? theme.text : theme.onAccent }}>
+      <ThemedText type="button" style={{ color: secondary ? theme.text : theme.onAccent }}>
         {label}
       </ThemedText>
     </Pressable>
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   placeName: { flex: 1 },
   pill: { paddingVertical: Spacing.one + 2, paddingHorizontal: Spacing.three, borderRadius: 999 },
   nowRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  bigNumber: { fontSize: 56, lineHeight: 64, fontWeight: '700' },
+  bigNumber: { fontSize: 56, lineHeight: 66, fontFamily: HeadingFont.bold },
   nowText: { flex: 1, gap: Spacing.half },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, marginTop: Spacing.two },
   thresholdLine: {

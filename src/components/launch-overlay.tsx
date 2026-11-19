@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { HeadingFont, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { randomEncouragement } from '@/lib/encouragement';
 
@@ -54,6 +54,6 @@ const styles = StyleSheet.create({
   content: { alignItems: 'center', gap: Spacing.three, paddingHorizontal: Spacing.five, maxWidth: 420 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   dot: { width: 12, height: 12, borderRadius: 6 },
-  brand: { fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: -0.5 },
+  brand: { fontSize: 30, lineHeight: 38, fontFamily: HeadingFont.bold, letterSpacing: -0.5 },
   message: { fontSize: 17, lineHeight: 25, textAlign: 'center' },
 });

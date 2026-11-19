@@ -54,6 +54,15 @@ export const Fonts = Platform.select({
   },
 });
 
+/**
+ * Plus Jakarta Sans for headings, medication names, big numbers, and buttons.
+ * Body text keeps the system font. (Don't combine with fontWeight: each weight is its own font.)
+ */
+export const HeadingFont = {
+  bold: 'PlusJakartaSans_700Bold',
+  semibold: 'PlusJakartaSans_600SemiBold',
+} as const;
+
 export const Spacing = {
   half: 2,
   one: 4,

@@ -155,7 +155,7 @@ export function ActionButton({
         styles.action,
         { backgroundColor: bg, opacity: disabled ? 0.5 : pressed ? 0.7 : 1 },
       ]}>
-      <ThemedText type="smallBold" style={{ color: fg }}>
+      <ThemedText type="button" style={{ color: fg }}>
         {label}
       </ThemedText>
     </Pressable>
