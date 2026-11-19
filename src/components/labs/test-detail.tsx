@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  changeSinceLast,
   displayStatus,
   FLAG_LABEL,
   flagFor,
@@ -111,6 +112,17 @@ export function TestDetail({
           {latest && (
             <Card>
               <LabChart results={results} accepted={note?.okForMe} />
+              {changeSinceLast(results) && (
+                <ThemedText type="smallBold">
+                  {changeSinceLast(results)}
+                  {status?.worsening ? (
+                    <ThemedText type="small" style={{ color: theme.sunAlert }}>
+                      {' '}
+                      · {status.trend}
+                    </ThemedText>
+                  ) : null}
+                </ThemedText>
+              )}
               <ThemedText type="small" themeColor="textSecondary">
                 Normal range: {formatRange(latest.low, latest.high, latest.unit)}
               </ThemedText>

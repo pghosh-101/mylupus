@@ -327,3 +327,24 @@ export async function setLabName(test: string, name: string | null): Promise<Rec
 
 /** The built-in name, ignoring any rename. */
 export const defaultLabName = (test: string) => testFor(test)?.name ?? test.replace(/^custom:/, '');
+
+/** "Above range" / "Within range" / "Below range" (empty when no range is set). */
+export function rangeLabel(r: Pick<LabResult, 'value' | 'low' | 'high'>): string {
+  const flag = flagFor(r);
+  return flag === 'high' ? 'Above range' : flag === 'low' ? 'Below range' : flag === 'normal' ? 'Within range' : '';
+}
+
+/** e.g. "↓ 27% since Aug 17", comparing the latest result with the one before it. */
+export function changeSinceLast(results: LabResult[]): string | null {
+  const latest = results[results.length - 1];
+  const prev = results[results.length - 2];
+  if (!latest || !prev || prev.value === 0) return null;
+  const pct = Math.round(((latest.value - prev.value) / Math.abs(prev.value)) * 100);
+  const [y, m, d] = prev.date.split('-').map(Number);
+  const prevDate = new Date(y, m - 1, d);
+  const since = prevDate.toLocaleDateString(
+    undefined,
+    y === new Date().getFullYear() ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' },
+  );
+  return pct === 0 ? `No change since ${since}` : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% since ${since}`;
+}

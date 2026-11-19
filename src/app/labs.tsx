@@ -12,6 +12,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   byTest,
+  changeSinceLast,
   displayStatus,
   formatValue,
   LAB_TESTS,
@@ -19,6 +20,7 @@ import {
   loadLabNames,
   loadLabs,
   loadTestNotes,
+  rangeLabel,
   saveLabs,
   saveTestNote,
   setLabName,
@@ -203,6 +205,7 @@ export default function LabsScreen() {
   );
 }
 
+/** One lab in the list: name, change since last test, latest value, and where it sits in the range. */
 function TestRow({
   name,
   results,
@@ -216,49 +219,29 @@ function TestRow({
 }) {
   const theme = useTheme();
   const latest = results[results.length - 1];
-  const prev = results[results.length - 2];
-  const status = displayStatus(results, note);
-  let change = '';
-  if (prev && prev.value !== 0) {
-    const pct = Math.round(((latest.value - prev.value) / Math.abs(prev.value)) * 100);
-    const prevDate = parseDate(prev.date);
-    const since = prevDate.toLocaleDateString(
-      undefined,
-      prevDate.getFullYear() === new Date().getFullYear()
-        ? { month: 'short', day: 'numeric' }
-        : { month: 'short', day: 'numeric', year: 'numeric' },
-    );
-    change = pct === 0 ? `No change since ${since}` : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% since ${since}`;
-  }
-  const statusColor = status.tone === 'alert' ? theme.sunAlert : theme.textSecondary;
+  const change = changeSinceLast(results);
+  const label = rangeLabel(latest);
+  // Orange when out of range (unless the doctor said it's OK and it isn't getting worse).
+  const statusColor = displayStatus(results, note).tone === 'alert' ? theme.sunAlert : theme.textSecondary;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { borderColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 }]}>
       <View style={styles.flex}>
         <ThemedText type="smallBold">{name}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {change || `${results.length} result`}
+          {change ?? '1 result'}
         </ThemedText>
-        {status.worsening && (
-          <ThemedText type="small" style={{ color: theme.sunAlert }}>
-            {status.trend}
-          </ThemedText>
-        )}
-        {note?.note ? (
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={2} style={styles.note}>
-            Doctor: {note.note}
-          </ThemedText>
-        ) : null}
       </View>
       <View style={styles.right}>
         <ThemedText type="smallBold">
           {formatValue(latest.value)} <ThemedText type="small" themeColor="textSecondary">{latest.unit}</ThemedText>
         </ThemedText>
-        {status.label ? (
-          <ThemedText type="small" style={[styles.status, { color: statusColor }]}>
-            {status.label}
+        {label ? (
+          <ThemedText type="small" style={{ color: statusColor }}>
+            {label}
           </ThemedText>
         ) : null}
       </View>
+      <ThemedText themeColor="textSecondary">›</ThemedText>
     </Pressable>
   );
 }
