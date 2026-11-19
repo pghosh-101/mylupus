@@ -11,6 +11,8 @@ export const Colors = {
     textSecondary: '#625C73',
     /** Brand accent (butterfly purple, the lupus awareness color). */
     accent: '#6B4FBB',
+    /** Text and icons drawn on top of the accent color. */
+    onAccent: '#FFFFFF',
     /** UV above your threshold. */
     sunAlert: '#D9622B',
     /** UV at or below your threshold. */
@@ -23,6 +25,7 @@ export const Colors = {
     backgroundSelected: '#2B2639',
     textSecondary: '#B3ACC4',
     accent: '#A890F0',
+    onAccent: '#FFFFFF',
     sunAlert: '#F2884F',
     sunCalm: '#4A4459',
   },

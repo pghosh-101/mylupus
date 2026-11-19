@@ -419,7 +419,7 @@ function Button({
     <Pressable
       onPress={onPress}
       style={[styles.button, { backgroundColor: secondary ? theme.backgroundSelected : theme.accent }]}>
-      <ThemedText type="smallBold" style={{ color: secondary ? theme.text : '#fff' }}>
+      <ThemedText type="smallBold" style={{ color: secondary ? theme.text : theme.onAccent }}>
         {label}
       </ThemedText>
     </Pressable>

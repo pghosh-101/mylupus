@@ -123,7 +123,7 @@ export function Segmented<T extends string | number>({
                 borderColor: selected ? theme.accent : theme.backgroundSelected,
               },
             ]}>
-            <ThemedText type="smallBold" style={{ color: selected ? '#fff' : theme.text }}>
+            <ThemedText type="smallBold" style={{ color: selected ? theme.onAccent : theme.text }}>
               {o.label}
             </ThemedText>
           </Pressable>
@@ -146,7 +146,7 @@ export function ActionButton({
 }) {
   const theme = useTheme();
   const bg = kind === 'primary' ? theme.accent : theme.backgroundSelected;
-  const fg = kind === 'primary' ? '#fff' : kind === 'danger' ? theme.sunAlert : theme.accent;
+  const fg = kind === 'primary' ? theme.onAccent : kind === 'danger' ? theme.sunAlert : theme.accent;
   return (
     <Pressable
       onPress={onPress}
@@ -218,7 +218,7 @@ export function MultiChips({
                 borderColor: on ? theme.accent : theme.backgroundSelected,
               },
             ]}>
-            <ThemedText type="small" style={{ color: on ? '#fff' : theme.text, fontWeight: '600' }}>
+            <ThemedText type="small" style={{ color: on ? theme.onAccent : theme.text, fontWeight: '600' }}>
               {o}
             </ThemedText>
           </Pressable>

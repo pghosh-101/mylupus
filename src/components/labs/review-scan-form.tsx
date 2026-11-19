@@ -130,7 +130,7 @@ export function ReviewScanForm({
                       styles.check,
                       { borderColor: theme.accent, backgroundColor: r.include ? theme.accent : 'transparent' },
                     ]}>
-                    {r.include && <ThemedText style={styles.checkMark}>✓</ThemedText>}
+                    {r.include && <ThemedText style={[styles.checkMark, { color: theme.onAccent }]}>✓</ThemedText>}
                   </View>
                   <ThemedText type="smallBold" style={styles.flex}>
                     {labName(r.test)}
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   row: { borderTopWidth: 1, paddingTop: Spacing.two, gap: Spacing.two },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   check: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  checkMark: { color: '#fff', fontSize: 14, lineHeight: 16 },
+  checkMark: { fontSize: 14, lineHeight: 16 },
   flex: { flex: 1 },
   valueRow: { flexDirection: 'row', gap: Spacing.two },
   unit: { width: 110 },

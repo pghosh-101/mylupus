@@ -199,7 +199,7 @@ export default function AskScreen() {
                           ? [styles.mine, { backgroundColor: theme.accent }]
                           : [styles.theirs, { backgroundColor: theme.backgroundElement }],
                       ]}>
-                      <ThemedText selectable style={mine ? styles.mineText : undefined}>
+                      <ThemedText selectable style={mine ? { color: theme.onAccent } : undefined}>
                         {text}
                       </ThemedText>
                       {sources.length > 0 && (
@@ -261,7 +261,7 @@ export default function AskScreen() {
               onPress={() => send(draft)}
               disabled={!draft.trim() || sending}
               style={[styles.send, { backgroundColor: theme.accent, opacity: !draft.trim() || sending ? 0.4 : 1 }]}>
-              <ThemedText type="smallBold" style={styles.mineText}>
+              <ThemedText type="smallBold" style={{ color: theme.onAccent }}>
                 Send
               </ThemedText>
             </Pressable>
@@ -293,7 +293,6 @@ const styles = StyleSheet.create({
   bubble: { borderRadius: 18, paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three, maxWidth: '88%' },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 6 },
   theirs: { alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
-  mineText: { color: '#fff' },
   thinking: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   sources: { borderTopWidth: 1, marginTop: Spacing.two, paddingTop: Spacing.two, gap: Spacing.one },
   inputBar: {
