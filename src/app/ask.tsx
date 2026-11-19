@@ -1,9 +1,11 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -12,13 +14,21 @@ import {
   View,
   type ScrollViewInstance,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { aiErrorMessage, hasAiKey } from '@/lib/ai';
-import { ask, clearConversation, dropUnanswered, loadConversation, textOf, type Conversation } from '@/lib/chat';
+import {
+  ask,
+  clearConversation,
+  dropUnanswered,
+  loadConversation,
+  sourcesOf,
+  textOf,
+  type Conversation,
+} from '@/lib/chat';
 import { Settings } from '@/lib/settings';
 import { formatTime } from '@/lib/uv';
 
@@ -28,7 +38,11 @@ const STARTERS = [
   'How are my labs trending?',
   'Summarize the last 3 months for my rheumatologist',
   'What should I ask at my next appointment?',
+  'What foods are generally recommended for lupus?',
 ];
+
+/** Height of the iPhone tab bar above the home-indicator area. */
+const TAB_BAR_HEIGHT = Platform.select({ ios: 56, android: 64, default: 0 });
 
 export default function AskScreen() {
   const theme = useTheme();
@@ -36,6 +50,19 @@ export default function AskScreen() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const scroll = useRef<ScrollViewInstance>(null);
+  const insets = useSafeAreaInsets();
+  const [keyboardUp, setKeyboardUp] = useState(false);
+
+  // While typing, the keyboard covers the tab bar, so the input can sit right on top of it.
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardUp(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  const inputBottom = keyboardUp ? Spacing.two : insets.bottom + TAB_BAR_HEIGHT + Spacing.two;
 
   useFocusEffect(
     useCallback(() => {
@@ -125,8 +152,9 @@ export default function AskScreen() {
                     medications, labs, and UV.
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    I look for patterns in your own data and can help you prepare for appointments. I can&apos;t
-                    diagnose or change your treatment. Each question uses a little API credit (about 1–3¢).
+                    I look for patterns in your own data and can search reputable medical sources for general
+                    questions. I can&apos;t diagnose or change your treatment. Each question uses a little API credit
+                    (about 1–3¢, a few cents more when I search the web).
                   </ThemedText>
                 </View>
                 <ThemedText type="smallBold" themeColor="textSecondary">
@@ -155,6 +183,7 @@ export default function AskScreen() {
                   const mine = m.role === 'user';
                   const text = textOf(m);
                   if (!text) return null;
+                  const sources = sourcesOf(m);
                   return (
                     <View
                       key={i}
@@ -167,6 +196,20 @@ export default function AskScreen() {
                       <ThemedText selectable style={mine ? styles.mineText : undefined}>
                         {text}
                       </ThemedText>
+                      {sources.length > 0 && (
+                        <View style={[styles.sources, { borderColor: theme.backgroundSelected }]}>
+                          <ThemedText type="smallBold" themeColor="textSecondary">
+                            SOURCES
+                          </ThemedText>
+                          {sources.map((src, j) => (
+                            <Pressable key={src.url} onPress={() => Linking.openURL(src.url)} hitSlop={4}>
+                              <ThemedText type="small" style={{ color: theme.accent }} numberOfLines={2}>
+                                {j + 1}. {src.title}
+                              </ThemedText>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
                     </View>
                   );
                 })}
@@ -174,7 +217,7 @@ export default function AskScreen() {
                   <View style={[styles.bubble, styles.theirs, styles.thinking, { backgroundColor: theme.backgroundElement }]}>
                     <ActivityIndicator size="small" />
                     <ThemedText type="small" themeColor="textSecondary">
-                      Looking through your history…
+                      Thinking…
                     </ThemedText>
                   </View>
                 )}
@@ -184,7 +227,11 @@ export default function AskScreen() {
         </ScrollView>
 
         {hasAiKey && (
-          <View style={[styles.inputBar, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
+          <View
+            style={[
+              styles.inputBar,
+              { borderColor: theme.backgroundSelected, backgroundColor: theme.background, paddingBottom: inputBottom },
+            ]}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -231,13 +278,13 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
   mineText: { color: '#fff' },
   thinking: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  sources: { borderTopWidth: 1, marginTop: Spacing.two, paddingTop: Spacing.two, gap: Spacing.one },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
-    paddingBottom: BottomTabInset + Spacing.two,
     borderTopWidth: 1,
   },
   input: {

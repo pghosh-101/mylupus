@@ -53,7 +53,15 @@ export type Conversation = {
   /** Snapshot of the user's data, taken when the chat started and never changed afterwards. */
   context: string;
   messages: ChatMessage[];
+  /**
+   * Whether this chat can search the web. Fixed when the chat starts, because changing the
+   * tools mid-conversation would edit its history.
+   */
+  webSearch?: boolean;
 };
+
+/** Claude's server-side web search tool. Searches only happen when a question needs them. */
+const WEB_SEARCH_TOOL = { type: 'web_search_20260209', name: 'web_search', max_uses: 3 };
 
 const KEY = 'mylupus.chat';
 
@@ -83,8 +91,24 @@ export function textOf(m: ChatMessage): string {
   return m.content
     .filter((b) => b.type === 'text' && typeof b.text === 'string')
     .map((b) => b.text as string)
-    .join('\n\n')
+    // Citations split a paragraph into several text blocks, so join them without extra breaks.
+    .join('')
     .trim();
+}
+
+export type Source = { url: string; title: string };
+
+/** Web pages an assistant turn cited, deduplicated. */
+export function sourcesOf(m: ChatMessage): Source[] {
+  if (m.role === 'user') return [];
+  const seen = new Map<string, Source>();
+  for (const b of m.content) {
+    const citations = (b.citations as { url?: string; title?: string }[] | undefined) ?? [];
+    for (const c of citations) {
+      if (c.url && !seen.has(c.url)) seen.set(c.url, { url: c.url, title: c.title || c.url });
+    }
+  }
+  return [...seen.values()];
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +292,8 @@ How to answer:
 - Say plainly when the data is too thin to tell (few check-ins, gaps, one lab result). Don't fill gaps with guesses.
 - Describe patterns as correlations, not causes ("flares have followed weeks of short sleep" rather than "short sleep causes your flares"), and note that a few data points can be coincidence.
 - Where general lupus knowledge helps, you can add it, clearly separated from what their data shows.
+- For general questions (foods, exercise, weather, research, what a test means) use web search when it's available and the answer benefits from current or authoritative information. Prefer reputable medical sources: the Lupus Foundation of America, Lupus Research Alliance, NIH and NIAMS, CDC, Mayo Clinic, Cleveland Clinic, Johns Hopkins Lupus Center, and peer-reviewed research. Avoid blogs, forums, and sites selling products. Say when evidence is limited or mixed (for example, most diet advice for lupus has limited evidence). Where it helps, connect the general answer back to their own data.
+- Don't search for questions about their own history; the data below has everything you need for those.
 - A doctor's note on a lab (especially "Doctor says this level is OK") reflects their care team's judgment. Respect it and don't raise alarm about that level, but do point out new changes.
 - Be warm and direct. Lead with the answer. Keep it short: a few sentences or a short list, unless they ask for a summary or report.
 
@@ -287,6 +313,7 @@ export async function ask(question: string, existing: Conversation | null): Prom
     startedAt: Date.now(),
     context: await buildContext(),
     messages: [],
+    webSearch: true,
   };
   const withQuestion: Conversation = {
     ...convo,
@@ -295,24 +322,35 @@ export async function ask(question: string, existing: Conversation | null): Prom
   // Save the question right away so it isn't lost if the request fails.
   await saveConversation(withQuestion);
 
-  const response = await createMessage(
-    {
-      model: CHAT_MODEL,
-      max_tokens: 16000,
-      output_config: { effort: 'medium' },
-      // If a safety classifier declines, let the API retry on a fallback model automatically.
-      fallbacks: 'default',
-      system: [
-        { type: 'text', text: SYSTEM_PROMPT },
-        // The snapshot is the same for every turn of this chat, so cache it.
-        { type: 'text', text: `# ${Settings.name}'s data\n${convo.context}`, cache_control: { type: 'ephemeral' } },
-      ],
-      messages: withQuestion.messages.map((m) => ({ role: m.role, content: m.content })),
-    },
-    { betas: ['server-side-fallback-2026-07-01'], timeoutMs: 180_000 },
-  );
+  const request = (messages: { role: string; content: unknown }[]) =>
+    createMessage(
+      {
+        model: CHAT_MODEL,
+        max_tokens: 16000,
+        output_config: { effort: 'medium' },
+        // If a safety classifier declines, let the API retry on a fallback model automatically.
+        fallbacks: 'default',
+        ...(convo.webSearch ? { tools: [WEB_SEARCH_TOOL] } : {}),
+        system: [
+          { type: 'text', text: SYSTEM_PROMPT },
+          // The snapshot is the same for every turn of this chat, so cache it.
+          { type: 'text', text: `# ${Settings.name}'s data\n${convo.context}`, cache_control: { type: 'ephemeral' } },
+        ],
+        messages,
+      },
+      { betas: ['server-side-fallback-2026-07-01'], timeoutMs: 180_000 },
+    );
 
-  const reply: ChatMessage = { role: 'assistant', content: response.content, at: Date.now() };
+  const history = withQuestion.messages.map((m) => ({ role: m.role, content: m.content as unknown }));
+  let response = await request(history);
+  let content = response.content;
+  // A long server-side search loop can pause; resume it by sending the partial turn back as-is.
+  for (let i = 0; i < 3 && response.stop_reason === 'pause_turn'; i++) {
+    response = await request([...history, { role: 'assistant', content }]);
+    content = [...content, ...response.content];
+  }
+
+  const reply: ChatMessage = { role: 'assistant', content, at: Date.now() };
   if (response.stop_reason === 'refusal' && !textOf(reply)) {
     throw new Error("Claude couldn't answer that one. Try rephrasing the question.");
   }
