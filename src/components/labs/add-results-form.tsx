@@ -8,7 +8,16 @@ import { useTheme } from '@/hooks/use-theme';
 import { LAB_TESTS, labName, newLabId, testFor, type LabResult } from '@/lib/labs';
 import { todayString } from '@/lib/meds';
 
-type Row = { test: string; value: string; unit: string; low: string; high: string; showRange: boolean };
+type Row = {
+  test: string;
+  value: string;
+  unit: string;
+  low: string;
+  high: string;
+  showRange: boolean;
+  note: string;
+  showNote: boolean;
+};
 
 const num = (s: string) => (s.trim() === '' || isNaN(Number(s)) ? null : Number(s));
 
@@ -21,6 +30,8 @@ function rowFor(test: string): Row {
     low: t?.low?.toString() ?? '',
     high: t?.high?.toString() ?? '',
     showRange: false,
+    note: '',
+    showNote: false,
   };
 }
 
@@ -70,7 +81,7 @@ export function AddResultsForm({
         unit: r.unit.trim(),
         low: num(r.low),
         high: num(r.high),
-        note: '',
+        note: r.note.trim(),
       })),
     );
   };
@@ -125,6 +136,19 @@ export function AddResultsForm({
               Normal range: {r.low || '–'} to {r.high || '–'} {r.unit} · {r.showRange ? 'Done' : 'Edit to match your report'}
             </ThemedText>
           </Pressable>
+          <Pressable onPress={() => update(i, { showNote: !r.showNote })} hitSlop={8}>
+            <ThemedText type="small" style={{ color: theme.accent }}>
+              {r.showNote ? 'Hide note' : r.note ? 'Edit note' : "Add a doctor's note"}
+            </ThemedText>
+          </Pressable>
+          {r.showNote && (
+            <Input
+              value={r.note}
+              onChangeText={(v) => update(i, { note: v })}
+              placeholder="e.g. Doctor said this is OK, still coming down"
+              multiline
+            />
+          )}
           {r.showRange && (
             <View style={styles.valueRow}>
               <View style={styles.flex}>

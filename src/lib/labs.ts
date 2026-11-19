@@ -223,3 +223,68 @@ export function formatRange(low: number | null, high: number | null, unit: strin
 export function formatValue(v: number): string {
   return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
 }
+
+// ---------------------------------------------------------------------------
+// Doctor's notes per test
+// ---------------------------------------------------------------------------
+
+export type TestNote = {
+  note: string;
+  /** Your doctor has said the current level is acceptable, so don't flag it as a warning. */
+  okForMe: boolean;
+  /** When the note was last updated, "YYYY-MM-DD". */
+  updated: string;
+};
+
+const NOTES_KEY = 'mylupus.labNotes';
+
+export async function loadTestNotes(): Promise<Record<string, TestNote>> {
+  try {
+    const raw = await AsyncStorage.getItem(NOTES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveTestNote(test: string, note: TestNote | null) {
+  const all = await loadTestNotes();
+  if (note && (note.note.trim() || note.okForMe)) all[test] = note;
+  else delete all[test];
+  try {
+    await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(all));
+  } catch {
+    // Not fatal.
+  }
+}
+
+/** A rise of more than this since the previous result is flagged even when the doctor said OK. */
+const RISE_ALERT = 0.2;
+
+/**
+ * How to present a test's latest result, taking the doctor's note into account.
+ * `tone`: 'alert' (orange), 'ok' (out of range but accepted), 'normal'.
+ */
+export function displayStatus(results: LabResult[], note?: TestNote) {
+  const latest = results[results.length - 1];
+  const prev = results[results.length - 2];
+  const flag = flagFor(latest);
+  const out = flag === 'low' || flag === 'high';
+
+  // "Worsening" means moving further out of range in the direction it's already out.
+  let worsening = false;
+  if (prev && prev.value !== 0) {
+    const change = (latest.value - prev.value) / Math.abs(prev.value);
+    worsening = (flag === 'high' && change > RISE_ALERT) || (flag === 'low' && change < -RISE_ALERT);
+  }
+
+  if (!out) return { label: FLAG_LABEL[flag], tone: 'normal' as const, worsening: false };
+  if (note?.okForMe) {
+    return {
+      label: `${flag === 'high' ? 'Above' : 'Below'} range · Doctor says OK`,
+      tone: worsening ? ('alert' as const) : ('ok' as const),
+      worsening,
+    };
+  }
+  return { label: FLAG_LABEL[flag], tone: 'alert' as const, worsening };
+}

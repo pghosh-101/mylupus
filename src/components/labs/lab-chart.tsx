@@ -12,7 +12,7 @@ const H = 190;
 const PAD = { left: 44, right: 14, top: 16, bottom: 26 };
 
 /** One test over time: line + points, with the reference range shaded. Tap a point for its value. */
-export function LabChart({ results }: { results: LabResult[] }) {
+export function LabChart({ results, accepted }: { results: LabResult[]; accepted?: boolean }) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<number>(results.length - 1);
@@ -50,6 +50,12 @@ export function LabChart({ results }: { results: LabResult[] }) {
   const bandTop = y(high ?? yMax);
   const bandBottom = y(low ?? yMin);
   const sel = results[selected] ?? latest;
+  // Show years on the axis when the chart spans more than one year.
+  const multiYear = new Date(tMin).getFullYear() !== new Date(tMax).getFullYear();
+  const axisDate = (t: number) =>
+    multiYear
+      ? new Date(t).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+      : formatDate(new Date(t));
   const selFlag = flagFor(sel);
 
   return (
@@ -109,7 +115,7 @@ export function LabChart({ results }: { results: LabResult[] }) {
           {results.length > 1 && <Path d={path} stroke={theme.accent} strokeWidth={2} fill="none" />}
           {/* Points (big invisible hit targets) */}
           {results.map((r, i) => {
-            const out = flagFor(r) === 'low' || flagFor(r) === 'high';
+            const out = !accepted && (flagFor(r) === 'low' || flagFor(r) === 'high');
             return (
               <G key={r.id} onPress={() => setSelected(i)}>
                 <Circle cx={x(times[i])} cy={y(r.value)} r={16} fill="transparent" />
@@ -126,17 +132,19 @@ export function LabChart({ results }: { results: LabResult[] }) {
           })}
           {/* X labels: first and last date */}
           <SvgText x={PAD.left} y={H - 6} fontSize={11} fill={theme.textSecondary} textAnchor="start">
-            {formatDate(new Date(tMin))}
+            {axisDate(tMin)}
           </SvgText>
           {tMax !== tMin && (
             <SvgText x={PAD.left + plotW} y={H - 6} fontSize={11} fill={theme.textSecondary} textAnchor="end">
-              {formatDate(new Date(tMax))}
+              {axisDate(tMax)}
             </SvgText>
           )}
         </Svg>
       )}
       <ThemedText type="small" themeColor="textSecondary">
-        Shaded band = normal range from your latest result. Orange points are out of range. Tap a point to see it.
+        {accepted
+          ? "Shaded band = normal range. Your doctor said your level is OK, so points outside it aren't highlighted. Tap a point to see it."
+          : 'Shaded band = normal range from your latest result. Orange points are out of range. Tap a point to see it.'}
       </ThemedText>
     </View>
   );

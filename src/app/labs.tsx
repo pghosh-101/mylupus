@@ -11,15 +11,17 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   byTest,
-  FLAG_LABEL,
-  flagFor,
+  displayStatus,
   formatValue,
   LAB_TESTS,
   labName,
   loadLabs,
+  loadTestNotes,
   saveLabs,
+  saveTestNote,
   testFor,
   type LabResult,
+  type TestNote,
 } from '@/lib/labs';
 import { parseDate } from '@/lib/meds';
 
@@ -29,11 +31,18 @@ export default function LabsScreen() {
   const [labs, setLabs] = useState<LabResult[]>([]);
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, TestNote>>({});
+
+  const reload = useCallback(async () => {
+    const [l, n] = await Promise.all([loadLabs(), loadTestNotes()]);
+    setLabs(l);
+    setNotes(n);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadLabs().then(setLabs);
-    }, []),
+      reload();
+    }, [reload]),
   );
 
   const update = async (next: LabResult[]) => {
@@ -81,7 +90,7 @@ export default function LabsScreen() {
               {g.toUpperCase()}
             </ThemedText>
             {inGroup.map((t) => (
-              <TestRow key={t} results={grouped.get(t)!} onPress={() => setViewing(t)} />
+              <TestRow key={t} results={grouped.get(t)!} note={notes[t]} onPress={() => setViewing(t)} />
             ))}
           </Card>
         );
@@ -98,6 +107,15 @@ export default function LabsScreen() {
       <TestDetail
         test={viewing}
         results={viewing ? grouped.get(viewing) ?? [] : []}
+        note={viewing ? notes[viewing] : undefined}
+        onSaveNote={async (note) => {
+          if (!viewing) return;
+          await saveTestNote(viewing, note);
+          setNotes(await loadTestNotes());
+        }}
+        onSaveResult={async (result) => {
+          await update(labs.map((l) => (l.id === result.id ? result : l)));
+        }}
         onClose={() => setViewing(null)}
         onDelete={async (id) => {
           const next = labs.filter((l) => l.id !== id);
@@ -109,17 +127,17 @@ export default function LabsScreen() {
   );
 }
 
-function TestRow({ results, onPress }: { results: LabResult[]; onPress: () => void }) {
+function TestRow({ results, note, onPress }: { results: LabResult[]; note?: TestNote; onPress: () => void }) {
   const theme = useTheme();
   const latest = results[results.length - 1];
   const prev = results[results.length - 2];
-  const flag = flagFor(latest);
-  const out = flag === 'low' || flag === 'high';
+  const status = displayStatus(results, note);
   let change = '';
   if (prev && prev.value !== 0) {
     const pct = Math.round(((latest.value - prev.value) / Math.abs(prev.value)) * 100);
     change = pct === 0 ? 'No change' : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% since ${parseDate(prev.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
   }
+  const statusColor = status.tone === 'alert' ? theme.sunAlert : theme.textSecondary;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { borderColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 }]}>
       <View style={styles.flex}>
@@ -127,14 +145,24 @@ function TestRow({ results, onPress }: { results: LabResult[]; onPress: () => vo
         <ThemedText type="small" themeColor="textSecondary">
           {change || `${results.length} result`}
         </ThemedText>
+        {status.worsening && (
+          <ThemedText type="small" style={{ color: theme.sunAlert }}>
+            Rising since last test
+          </ThemedText>
+        )}
+        {note?.note ? (
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={2} style={styles.note}>
+            Doctor: {note.note}
+          </ThemedText>
+        ) : null}
       </View>
       <View style={styles.right}>
         <ThemedText type="smallBold">
           {formatValue(latest.value)} <ThemedText type="small" themeColor="textSecondary">{latest.unit}</ThemedText>
         </ThemedText>
-        {FLAG_LABEL[flag] ? (
-          <ThemedText type="small" style={{ color: out ? theme.sunAlert : theme.textSecondary }}>
-            {FLAG_LABEL[flag]}
+        {status.label ? (
+          <ThemedText type="small" style={[styles.status, { color: statusColor }]}>
+            {status.label}
           </ThemedText>
         ) : null}
       </View>
@@ -145,5 +173,7 @@ function TestRow({ results, onPress }: { results: LabResult[]; onPress: () => vo
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderTopWidth: 1, paddingTop: Spacing.two },
   flex: { flex: 1, gap: Spacing.half },
-  right: { alignItems: 'flex-end' },
+  right: { alignItems: 'flex-end', maxWidth: '45%' },
+  status: { textAlign: 'right' },
+  note: { fontStyle: 'italic' },
 });
