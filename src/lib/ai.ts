@@ -1,5 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
-
 import { LAB_TESTS } from '@/lib/labs';
 
 /**
@@ -15,27 +13,73 @@ export const hasAiKey = Boolean(API_KEY);
  */
 export const SCAN_MODEL = 'claude-haiku-5-5';
 
-let client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!API_KEY) throw new Error('No Claude API key set. Add EXPO_PUBLIC_ANTHROPIC_API_KEY to .env.local.');
-  // The app talks to the API directly from the phone (there's no server), which the SDK
-  // only allows with this flag.
-  client ??= new Anthropic({ apiKey: API_KEY, dangerouslyAllowBrowser: true });
-  return client;
+/** An error response from the Claude API. */
+export class ClaudeApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
-/** Turns SDK errors into short, readable messages. */
-export function aiErrorMessage(e: unknown): string {
-  if (e instanceof Anthropic.AuthenticationError) return 'The Claude API key was rejected. Check the key in .env.local.';
-  if (e instanceof Anthropic.PermissionDeniedError) return "This API key isn't allowed to make that request.";
-  if (e instanceof Anthropic.RateLimitError) return 'Too many requests right now. Wait a minute and try again.';
-  if (e instanceof Anthropic.BadRequestError) {
-    return /credit|balance|billing/i.test(e.message)
-      ? 'Your Claude API credit has run out. Add credit in the Claude Console.'
-      : `The request was rejected: ${e.message}`;
+type ContentBlock = { type: string; text?: string };
+type MessageResponse = { content: ContentBlock[]; stop_reason: string | null };
+
+/**
+ * POST /v1/messages over plain HTTPS. (The official TypeScript SDK doesn't load in the
+ * React Native development runtime, so the app calls the REST API directly.)
+ */
+async function createMessage(body: Record<string, unknown>, timeoutMs = 120_000): Promise<MessageResponse> {
+  if (!API_KEY) throw new Error('No Claude API key set. Add EXPO_PUBLIC_ANTHROPIC_API_KEY to .env.local.');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2026-10-21',
+        // Needed only for the web version (browsers enforce CORS); ignored on the phone.
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (controller.signal.aborted) throw new Error('Claude took too long to respond. Try again.');
+    throw new Error("Couldn't reach Claude. Check your internet connection.", { cause: e });
+  } finally {
+    clearTimeout(timer);
   }
-  if (e instanceof Anthropic.APIConnectionError) return "Couldn't reach Claude. Check your internet connection.";
-  if (e instanceof Anthropic.APIError) return `Claude returned an error (${e.status ?? 'unknown'}). Try again.`;
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const err: { error?: { message?: string } } = await res.json();
+      message = err.error?.message ?? message;
+    } catch {
+      // Keep the status text.
+    }
+    throw new ClaudeApiError(res.status, message);
+  }
+  return (await res.json()) as MessageResponse;
+}
+
+/** Turns API errors into short, readable messages. */
+export function aiErrorMessage(e: unknown): string {
+  if (e instanceof ClaudeApiError) {
+    if (e.status === 401) return 'The Claude API key was rejected. Check the key in .env.local.';
+    if (e.status === 403) return "This API key isn't allowed to make that request.";
+    if (e.status === 429) return 'Too many requests right now. Wait a minute and try again.';
+    if (e.status === 400 && /credit|balance|billing/i.test(e.message)) {
+      return 'Your Claude API credit has run out. Add credit in the Claude Console.';
+    }
+    if (e.status === 400) return `The request was rejected: ${e.message}`;
+    if (e.status === 529 || e.status >= 500) return 'Claude is busy or having trouble right now. Try again in a minute.';
+    return `Claude returned an error (${e.status}). Try again.`;
+  }
   return e instanceof Error ? e.message : 'Something went wrong.';
 }
 
@@ -103,7 +147,7 @@ Rules:
 - notes: a short plain-language note about anything skipped or uncertain, or "" if nothing.`;
 
 export async function readLabReport(images: ReportImage[]): Promise<{ results: ExtractedResult[]; notes: string }> {
-  const response = await getClient().messages.create({
+  const response = await createMessage({
     model: SCAN_MODEL,
     max_tokens: 16000,
     output_config: {
@@ -116,11 +160,11 @@ export async function readLabReport(images: ReportImage[]): Promise<{ results: E
         role: 'user',
         content: [
           ...images.map((img) => ({
-            type: 'image' as const,
-            source: { type: 'base64' as const, media_type: img.mediaType, data: img.base64 },
+            type: 'image',
+            source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
           })),
           {
-            type: 'text' as const,
+            type: 'text',
             text: images.length > 1 ? `These ${images.length} images are pages of lab reports.` : 'Here is a lab report.',
           },
         ],
@@ -131,8 +175,8 @@ export async function readLabReport(images: ReportImage[]): Promise<{ results: E
   if (response.stop_reason === 'refusal') throw new Error("Claude couldn't read this report. Try a clearer photo.");
   if (response.stop_reason === 'max_tokens') throw new Error('The report was too long to read in one go. Try fewer pages at a time.');
 
-  const text = response.content.find((b) => b.type === 'text');
-  if (!text || text.type !== 'text') throw new Error('No results came back. Try again.');
+  const text = response.content.find((b) => b.type === 'text' && typeof b.text === 'string');
+  if (!text?.text) throw new Error('No results came back. Try again.');
   let parsed: { results?: ExtractedResult[]; notes?: string };
   try {
     parsed = JSON.parse(text.text);
