@@ -34,9 +34,21 @@ export async function fetchUvForecast(
     `?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}` +
     '&hourly=uv_index&timezone=auto&forecast_days=1';
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Weather service returned ${res.status}`);
-  const data: OpenMeteoResponse = await res.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  let data: OpenMeteoResponse;
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`The weather service returned an error (${res.status}).`);
+    data = await res.json();
+  } catch (e) {
+    if (controller.signal.aborted) {
+      throw new Error('The weather service took too long to respond. Check your connection and try again.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 
   const hours: UvHour[] = data.hourly.time.map((t, i) => ({
     hour: Number(t.slice(11, 13)),

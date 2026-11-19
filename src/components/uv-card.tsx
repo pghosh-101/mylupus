@@ -10,38 +10,71 @@ import { Settings } from '@/lib/settings';
 import { fetchUvForecast, formatHour, uvCategory, type UvForecast } from '@/lib/uv';
 
 type State =
-  | { status: 'loading' }
+  | { status: 'loading'; step: string }
   | { status: 'error'; message: string }
   | { status: 'ready'; forecast: UvForecast; place: string | null };
+
+/** Rejects with `message` if `promise` takes longer than `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Fast path: a recent cached position. Otherwise ask the GPS, with a time limit. */
+async function getPosition() {
+  const cached = await Location.getLastKnownPositionAsync({ maxAge: 30 * 60 * 1000 });
+  if (cached) return cached.coords;
+  const fresh = await withTimeout(
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low }),
+    15000,
+    "Couldn't find your location in time. Check that Location Services are on, then try again.",
+  );
+  return fresh.coords;
+}
 
 export function UvCard() {
   const theme = useTheme();
   const threshold = Settings.uvThreshold;
-  const [state, setState] = useState<State>({ status: 'loading' });
+  const [state, setState] = useState<State>({ status: 'loading', step: 'Starting…' });
 
   const load = useCallback(async () => {
-    setState({ status: 'loading' });
     try {
+      setState({ status: 'loading', step: 'Checking location permission…' });
       const perm = await Location.requestForegroundPermissionsAsync();
       if (perm.status !== 'granted') {
         setState({
           status: 'error',
-          message: 'MyLupus needs your location to look up the UV index where you are.',
+          message:
+            'MyLupus needs your location to look up the UV index where you are. Turn it on in Settings > Privacy & Security > Location Services > Expo Go.',
         });
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-      const { latitude, longitude } = pos.coords;
-      const forecast = await fetchUvForecast(latitude, longitude, threshold);
 
-      let place: string | null = null;
-      try {
-        const [addr] = await Location.reverseGeocodeAsync({ latitude, longitude });
-        place = addr?.city ?? addr?.region ?? null;
-      } catch {
-        // Place name is a nice-to-have; ignore failures.
-      }
-      setState({ status: 'ready', forecast, place });
+      setState({ status: 'loading', step: 'Finding your location…' });
+      const { latitude, longitude } = await getPosition();
+
+      setState({ status: 'loading', step: "Getting today's UV forecast…" });
+      const forecast = await fetchUvForecast(latitude, longitude, threshold);
+      setState({ status: 'ready', forecast, place: null });
+
+      // Place name is a nice-to-have: look it up after the UV is already showing.
+      withTimeout(Location.reverseGeocodeAsync({ latitude, longitude }), 5000, 'timeout')
+        .then(([addr]) => {
+          const place = addr?.city ?? addr?.region ?? null;
+          if (place) setState((s) => (s.status === 'ready' ? { ...s, place } : s));
+        })
+        .catch(() => {});
     } catch (e) {
       setState({ status: 'error', message: e instanceof Error ? e.message : 'Something went wrong.' });
     }
@@ -56,7 +89,7 @@ export function UvCard() {
       <Card>
         <ActivityIndicator />
         <ThemedText themeColor="textSecondary" style={styles.center}>
-          Checking today&apos;s UV…
+          {state.step}
         </ThemedText>
       </Card>
     );
