@@ -77,13 +77,21 @@ function StepButton({ text, onPress }: { text: string; onPress: () => void }) {
   );
 }
 
-/** Time picker in 15-minute steps. */
-export function TimeStepper({ value, onChange }: { value: Minutes; onChange: (m: Minutes) => void }) {
+/** Time picker in 15-minute steps (or `step`). */
+export function TimeStepper({
+  value,
+  onChange,
+  step = 15,
+}: {
+  value: Minutes;
+  onChange: (m: Minutes) => void;
+  step?: number;
+}) {
   return (
     <Stepper
       label={formatMinutes(value)}
-      onMinus={() => onChange(wrap(value - 15))}
-      onPlus={() => onChange(wrap(value + 15))}
+      onMinus={() => onChange(wrap(value - step))}
+      onPlus={() => onChange(wrap(value + step))}
     />
   );
 }

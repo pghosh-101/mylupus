@@ -5,20 +5,23 @@ import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { ActionButton } from '@/components/meds/controls';
 import { MedForm } from '@/components/meds/med-form';
 import { RoutineForm } from '@/components/meds/routine-form';
+import { TakenSheet } from '@/components/meds/taken-sheet';
 import { Card, Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   DEFAULT_ROUTINE,
-  doseKey,
   FOOD_RULE_HINT,
   formatDate,
   formatMinutes,
+  formatPlanMinutes,
   loadDoseLog,
   loadMeds,
   loadRoutine,
   logDose,
+  planDay,
+  rescheduleMedNotifications,
   saveMeds,
   saveRoutine,
   shortName,
@@ -28,6 +31,7 @@ import {
   undoDose,
   type DoseLogEntry,
   type Medication,
+  type PlannedDose,
   type Routine,
 } from '@/lib/meds';
 import { formatTime } from '@/lib/uv';
@@ -120,7 +124,7 @@ export default function MedsScreen() {
   );
 }
 
-/** Checklist of today's doses, in time order. */
+/** Checklist of today's doses, adjusted around what was actually taken. */
 function TodaysDoses({
   meds,
   log,
@@ -132,15 +136,20 @@ function TodaysDoses({
 }) {
   const theme = useTheme();
   const [snoozed, setSnoozed] = useState<Record<string, boolean>>({});
+  const [asking, setAsking] = useState<PlannedDose | null>(null);
   if (meds.length === 0) return null;
 
   const today = todayString();
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const doses = meds
-    .flatMap((med) => med.doseTimes.map((t, i) => ({ med, i, t, key: doseKey(today, med.id, i) })))
-    .sort((a, b) => a.t - b.t);
-  const done = doses.filter((d) => log.some((e) => e.key === d.key)).length;
+  const doses = planDay(meds, log, today);
+  const done = doses.filter((d) => d.entry).length;
+
+  const record = async (key: string, status: 'taken' | 'skipped', at?: number) => {
+    await logDose(key, status, at);
+    onChange();
+    rescheduleMedNotifications();
+  };
 
   return (
     <Card>
@@ -153,15 +162,17 @@ function TodaysDoses({
         </ThemedText>
       </View>
 
-      {doses.map(({ med, i, t, key }) => {
-        const entry = log.find((e) => e.key === key);
-        const due = t <= nowMinutes;
+      {doses.map((d) => {
+        const { med, key, entry } = d;
+        const due = d.planned <= nowMinutes;
+        const moved = !entry && d.planned !== d.scheduled;
         return (
           <View key={key} style={[styles.dose, { borderColor: theme.backgroundSelected }]}>
             <View style={styles.rowBetween}>
               <View style={styles.flex}>
                 <ThemedText type="smallBold">
-                  {formatMinutes(t)} · {shortName(med.name)}
+                  {formatPlanMinutes(entry?.status === 'skipped' ? d.scheduled : d.planned)} ·{' '}
+                  {shortName(med.name)}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
                   {med.pillsPerDose} pill{med.pillsPerDose === 1 ? '' : 's'} · {FOOD_RULE_HINT[med.foodRule]}
@@ -173,6 +184,7 @@ function TodaysDoses({
                   onPress={async () => {
                     await undoDose(key);
                     onChange();
+                    rescheduleMedNotifications();
                   }}>
                   <ThemedText type="small" style={{ color: theme.accent }}>
                     Undo
@@ -181,41 +193,53 @@ function TodaysDoses({
               )}
             </View>
 
+            {moved && (
+              <ThemedText type="small" style={{ color: theme.sunAlert }}>
+                Moved from {formatMinutes(d.scheduled)} · {d.reason}
+              </ThemedText>
+            )}
+            {!entry && med.foodRule === 'empty_stomach' && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {d.planned - 120 <= nowMinutes
+                  ? `Eat next after ${formatPlanMinutes(d.planned + 60)}`
+                  : `No food ${formatPlanMinutes(d.planned - 120)} – ${formatPlanMinutes(d.planned + 60)}`}
+              </ThemedText>
+            )}
+
             {entry ? (
               <ThemedText type="small" style={{ color: entry.status === 'taken' ? theme.accent : theme.textSecondary }}>
                 {entry.status === 'taken' ? '✓ Taken' : 'Skipped'} at {formatTime(new Date(entry.at))}
               </ThemedText>
             ) : (
               <View style={styles.doseButtons}>
-                <SmallButton
-                  label="Taken"
-                  primary={due}
-                  onPress={async () => {
-                    await logDose(key, 'taken');
-                    onChange();
-                  }}
-                />
+                <SmallButton label="Taken" primary={due} onPress={() => setAsking(d)} />
                 {due && (
                   <SmallButton
                     label={snoozed[key] ? 'Snoozed' : 'Snooze 15 min'}
                     onPress={async () => {
-                      await snoozeDose(med, i);
+                      await snoozeDose(med, d.doseIndex, today);
                       setSnoozed({ ...snoozed, [key]: true });
                     }}
                   />
                 )}
-                <SmallButton
-                  label="Skip"
-                  onPress={async () => {
-                    await logDose(key, 'skipped');
-                    onChange();
-                  }}
-                />
+                <SmallButton label="Skip" onPress={() => record(key, 'skipped')} />
               </View>
             )}
           </View>
         );
       })}
+
+      <TakenSheet
+        dose={asking}
+        date={today}
+        onClose={() => setAsking(null)}
+        onConfirm={async (at) => {
+          const key = asking?.key;
+          setAsking(null);
+          if (!key) return;
+          await record(key, 'taken', at);
+        }}
+      />
     </Card>
   );
 }

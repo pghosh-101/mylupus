@@ -41,6 +41,7 @@ export function MedForm({ visible, med, routine, onSave, onDelete, onClose }: Pr
   const [times, setTimes] = useState<Minutes[]>([routine.breakfast]);
   const [instructions, setInstructions] = useState('');
   const [sideEffects, setSideEffects] = useState('');
+  const [spacing, setSpacing] = useState(0);
   const [trackSupply, setTrackSupply] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [asOf, setAsOf] = useState(todayString());
@@ -54,6 +55,7 @@ export function MedForm({ visible, med, routine, onSave, onDelete, onClose }: Pr
     setTimes(med?.doseTimes ?? [routine.breakfast]);
     setInstructions(med?.instructions ?? '');
     setSideEffects(med?.sideEffects ?? '');
+    setSpacing(med?.spacingHours ?? 0);
     setTrackSupply(Boolean(med?.supply));
     setQuantity(med?.supply ? String(med.supply.quantity) : '');
     setAsOf(med?.supply?.asOf ?? todayString());
@@ -72,6 +74,7 @@ export function MedForm({ visible, med, routine, onSave, onDelete, onClose }: Pr
     instructions: instructions.trim(),
     sideEffects: sideEffects.trim(),
     supply: trackSupply && Number(quantity) > 0 ? { quantity: Number(quantity), asOf } : null,
+    spacingHours: spacing,
   };
   const supply = supplyInfo(draft);
 
@@ -182,6 +185,20 @@ export function MedForm({ visible, med, routine, onSave, onDelete, onClose }: Pr
               label="Suggest times from my routine"
               kind="secondary"
               onPress={() => setTimes(suggestTimes(times.length, foodRule, routine))}
+            />
+          </Field>
+
+          <Field
+            label="Keep apart from other meds"
+            hint={
+              spacing
+                ? `If you take this late, other meds that day move to at least ${spacing} hour${spacing === 1 ? '' : 's'} later.`
+                : 'No extra spacing. Food rules still apply.'
+            }>
+            <Segmented
+              options={[0, 1, 2, 3, 4].map((h) => ({ value: h, label: h === 0 ? 'None' : `${h} hr` }))}
+              value={spacing}
+              onChange={setSpacing}
             />
           </Field>
 

@@ -26,6 +26,8 @@ export type Medication = {
   sideEffects: string;
   /** Pills on hand as of a date. Null if not tracking refills. */
   supply: { quantity: number; asOf: string } | null;
+  /** Keep doses at least this many hours away from other medications. */
+  spacingHours?: number;
 };
 
 /** Daily routine used to suggest dose times. */
@@ -241,10 +243,11 @@ export function supplyInfo(med: Medication, today = new Date()) {
 
 export const doseKey = (date: string, medId: string, doseIndex: number) => `${date}|${medId}|${doseIndex}`;
 
-export async function logDose(key: string, status: DoseStatus) {
+/** Record a dose. `at` is when it was actually taken (defaults to now). */
+export async function logDose(key: string, status: DoseStatus, at = Date.now()) {
   const log = await loadDoseLog();
   const next = log.filter((e) => e.key !== key);
-  next.push({ key, status, at: Date.now() });
+  next.push({ key, status, at });
   await writeJSON(LOG_KEY, next.slice(-5000));
 }
 
@@ -256,6 +259,104 @@ export async function undoDose(key: string) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Day plan: adjust later doses around what was actually taken
+// ---------------------------------------------------------------------------
+
+export type PlannedDose = {
+  med: Medication;
+  doseIndex: number;
+  key: string;
+  /** The time from the medication's schedule. */
+  scheduled: Minutes;
+  /**
+   * When to take it, after spacing and food rules. Minutes from midnight of the plan's day;
+   * can exceed 1440 for doses pushed past midnight.
+   */
+  planned: Minutes;
+  /** Why it moved, if it did. */
+  reason: string | null;
+  entry: DoseLogEntry | null;
+  /** For taken doses: minutes from midnight of the plan's day. */
+  takenAt: Minutes | null;
+};
+
+/** Format plan minutes, which may run past midnight. */
+export function formatPlanMinutes(m: Minutes): string {
+  return formatMinutes(wrap(m)) + (m >= DAY ? ' (after midnight)' : '');
+}
+
+/**
+ * Today's doses with later ones pushed back as needed:
+ * - at least `spacingHours` from other medications (the larger of the two meds' settings),
+ * - empty-stomach doses at least 2 hours after a with-food dose (that dose marks a meal),
+ * - with-food doses at least 1 hour after an empty-stomach dose,
+ * - repeat doses of the same medication keep their usual gap (up to 1 hour shorter).
+ * Doses are never moved earlier than scheduled.
+ */
+export function planDay(meds: Medication[], log: DoseLogEntry[], date: string): PlannedDose[] {
+  const midnight = parseDate(date).getTime();
+  const doses: PlannedDose[] = meds
+    .flatMap((med) =>
+      med.doseTimes.map((t, i) => {
+        const key = doseKey(date, med.id, i);
+        const entry = log.find((e) => e.key === key) ?? null;
+        return {
+          med,
+          doseIndex: i,
+          key,
+          scheduled: t,
+          planned: t,
+          reason: null,
+          entry,
+          takenAt: entry?.status === 'taken' ? Math.round((entry.at - midnight) / 60000) : null,
+        };
+      }),
+    )
+    .sort((a, b) => a.scheduled - b.scheduled);
+
+  // Earlier events constrain later pending doses. Skipped doses don't count.
+  const events: { med: Medication; scheduled: Minutes; time: Minutes }[] = [];
+  for (const d of doses) {
+    if (d.entry?.status === 'skipped') continue;
+    if (d.takenAt !== null) {
+      d.planned = d.takenAt;
+      events.push({ med: d.med, scheduled: d.scheduled, time: d.takenAt });
+      continue;
+    }
+    for (const e of events) {
+      let earliest = 0;
+      let why = '';
+      const name = shortName(e.med.name);
+      if (e.med.id === d.med.id) {
+        earliest = e.time + (d.scheduled - e.scheduled) - 60;
+        why = `Keeps about ${Math.round((d.scheduled - e.scheduled) / 60)} hours after your last dose`;
+      } else {
+        const gap = Math.max(d.med.spacingHours ?? 0, e.med.spacingHours ?? 0) * 60;
+        if (gap > 0 && e.time + gap > earliest) {
+          earliest = e.time + gap;
+          why = `${gap / 60} hours after ${name}`;
+        }
+        if (d.med.foodRule === 'empty_stomach' && e.med.foodRule === 'with_food' && e.time + 120 >= earliest) {
+          earliest = e.time + 120;
+          why = `2 hours after ${name} and food`;
+        }
+        if (d.med.foodRule === 'with_food' && e.med.foodRule === 'empty_stomach' && e.time + 60 >= earliest) {
+          earliest = e.time + 60;
+          why = `1 hour after ${name} (empty stomach)`;
+        }
+      }
+      if (earliest > d.planned) {
+        d.planned = Math.ceil(earliest / 5) * 5;
+        d.reason = why;
+      }
+    }
+    events.push({ med: d.med, scheduled: d.scheduled, time: d.planned });
+  }
+  return doses;
+}
+
 // ---------------------------------------------------------------------------
 // Notifications
 // ---------------------------------------------------------------------------
@@ -265,7 +366,7 @@ const REFILL_PREFIX = 'refill-';
 const SNOOZE_PREFIX = 'snooze-';
 export const DOSE_CATEGORY = 'dose';
 
-type DoseData = { kind: 'dose'; medId: string; doseIndex: number };
+type DoseData = { kind: 'dose'; medId: string; doseIndex: number; date: string };
 
 /** Adds Taken / Snooze / Skip buttons to dose reminders (long-press the notification). */
 export async function setupDoseCategory() {
@@ -281,11 +382,11 @@ export async function setupDoseCategory() {
   }
 }
 
-function doseContent(med: Medication, doseIndex: number) {
+function doseContent(med: Medication, doseIndex: number, date: string) {
   return {
     title: `Time for ${shortName(med.name)}`,
     body: `${med.pillsPerDose} pill${med.pillsPerDose === 1 ? '' : 's'} · ${FOOD_RULE_HINT[med.foodRule]}`,
-    data: { kind: 'dose', medId: med.id, doseIndex } satisfies DoseData,
+    data: { kind: 'dose', medId: med.id, doseIndex, date } satisfies DoseData,
     categoryIdentifier: DOSE_CATEGORY,
   };
 }
@@ -293,12 +394,17 @@ function doseContent(med: Medication, doseIndex: number) {
 /** "CellCept (mycophenolate mofetil)" -> "CellCept" for short notification titles. */
 export const shortName = (name: string) => name.replace(/\s*\(.*\)\s*$/, '').trim() || name;
 
-/** Replace all dose and refill notifications to match the current medication list. */
-export async function rescheduleMedNotifications(meds: Medication[]) {
+/** iOS keeps at most 64 pending notifications; leave room for UV and sunscreen alerts. */
+const MAX_DOSE_NOTIFICATIONS = 48;
+
+/**
+ * Replace dose and refill notifications to match the medication list. Dose reminders are
+ * scheduled for each of the next days (not as a repeating alarm) so today's can follow the
+ * adjusted plan. Called whenever the app opens or a dose is logged, so the window keeps rolling.
+ */
+export async function rescheduleMedNotifications(meds?: Medication[]) {
   if (Platform.OS === 'web') return;
-  let permission = await getNotificationPermission();
-  if (permission === 'undetermined') permission = await requestNotificationPermission();
-  if (permission !== 'granted') return;
+  meds = meds ?? (await loadMeds());
 
   const existing = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
@@ -306,27 +412,42 @@ export async function rescheduleMedNotifications(meds: Medication[]) {
       .filter((n) => n.identifier.startsWith(DOSE_PREFIX) || n.identifier.startsWith(REFILL_PREFIX))
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
+  if (meds.length === 0) return;
 
-  for (const med of meds) {
-    for (const [i, t] of med.doseTimes.entries()) {
+  let permission = await getNotificationPermission();
+  if (permission === 'undetermined') permission = await requestNotificationPermission();
+  if (permission !== 'granted') return;
+
+  const log = await loadDoseLog();
+  const perDay = meds.reduce((n, m) => n + m.doseTimes.length, 0) || 1;
+  const days = Math.max(1, Math.min(14, Math.floor(MAX_DOSE_NOTIFICATIONS / perDay)));
+  const now = Date.now();
+
+  for (let offset = 0; offset < days; offset++) {
+    const day = new Date();
+    day.setDate(day.getDate() + offset);
+    const date = todayString(day);
+    const midnight = parseDate(date).getTime();
+    for (const d of planDay(meds, log, date)) {
+      if (d.entry) continue; // already taken or skipped
+      const when = midnight + d.planned * 60000;
+      if (when <= now) continue;
       await Notifications.scheduleNotificationAsync({
-        identifier: `${DOSE_PREFIX}${med.id}-${i}`,
-        content: doseContent(med, i),
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: Math.floor(t / 60),
-          minute: t % 60,
-        },
+        identifier: `${DOSE_PREFIX}${d.med.id}-${d.doseIndex}-${date}`,
+        content: doseContent(d.med, d.doseIndex, date),
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(when) },
       });
     }
+  }
 
+  for (const med of meds) {
     const supply = supplyInfo(med);
     if (!supply) continue;
     for (const daysBefore of [7, 3]) {
       const when = new Date(supply.runOut);
       when.setDate(when.getDate() - daysBefore);
       when.setHours(10, 0, 0, 0);
-      if (when.getTime() <= Date.now()) continue;
+      if (when.getTime() <= now) continue;
       await Notifications.scheduleNotificationAsync({
         identifier: `${REFILL_PREFIX}${med.id}-${daysBefore}`,
         content: {
@@ -339,11 +460,11 @@ export async function rescheduleMedNotifications(meds: Medication[]) {
   }
 }
 
-export async function snoozeDose(med: Medication, doseIndex: number, minutes = 15) {
+export async function snoozeDose(med: Medication, doseIndex: number, date = todayString(), minutes = 15) {
   if (Platform.OS === 'web') return;
   await Notifications.scheduleNotificationAsync({
     identifier: `${SNOOZE_PREFIX}${med.id}-${doseIndex}`,
-    content: doseContent(med, doseIndex),
+    content: doseContent(med, doseIndex, date),
     trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: minutes * 60 },
   });
 }
@@ -359,15 +480,16 @@ export function listenForDoseActions(onChange?: () => void): () => void {
     if (data?.kind !== 'dose' || !data.medId || data.doseIndex === undefined) return;
     const action = response.actionIdentifier;
     // A late-night dose answered after midnight still belongs to the day it was scheduled.
-    const firedAt = new Date(response.notification.date);
-    const key = doseKey(todayString(firedAt), data.medId, data.doseIndex);
+    const date = data.date ?? todayString(new Date(response.notification.date));
+    const key = doseKey(date, data.medId, data.doseIndex);
 
     if (action === 'taken') await logDose(key, 'taken');
     else if (action === 'skip') await logDose(key, 'skipped');
     else if (action === 'snooze') {
       const med = (await loadMeds()).find((m) => m.id === data.medId);
-      if (med) await snoozeDose(med, data.doseIndex);
+      if (med) await snoozeDose(med, data.doseIndex, date);
     }
+    if (action === 'taken' || action === 'skip') await rescheduleMedNotifications();
     onChange?.();
   });
   return () => sub.remove();
