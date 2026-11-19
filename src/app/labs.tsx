@@ -16,10 +16,12 @@ import {
   formatValue,
   LAB_TESTS,
   labName,
+  loadLabNames,
   loadLabs,
   loadTestNotes,
   saveLabs,
   saveTestNote,
+  setLabName,
   testFor,
   type LabResult,
   type TestNote,
@@ -35,13 +37,15 @@ export default function LabsScreen() {
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, TestNote>>({});
+  const [names, setNames] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<{ results: ExtractedResult[]; notes: string } | null>(null);
 
   const reload = useCallback(async () => {
-    const [l, n] = await Promise.all([loadLabs(), loadTestNotes()]);
+    const [l, n, names] = await Promise.all([loadLabs(), loadTestNotes(), loadLabNames()]);
     setLabs(l);
     setNotes(n);
+    setNames(names);
   }, []);
 
   useFocusEffect(
@@ -60,7 +64,7 @@ export default function LabsScreen() {
   const tests = [...grouped.keys()].sort(
     (a, b) =>
       LAB_TESTS.findIndex((t) => t.key === a) - LAB_TESTS.findIndex((t) => t.key === b) ||
-      labName(a).localeCompare(labName(b)),
+      labName(a, names).localeCompare(labName(b, names)),
   );
   const dates = labs.map((l) => l.date).sort();
   const lastDraw = dates.length ? dates[dates.length - 1] : null;
@@ -137,7 +141,13 @@ export default function LabsScreen() {
               {g.toUpperCase()}
             </ThemedText>
             {inGroup.map((t) => (
-              <TestRow key={t} results={grouped.get(t)!} note={notes[t]} onPress={() => setViewing(t)} />
+              <TestRow
+                key={t}
+                name={labName(t, names)}
+                results={grouped.get(t)!}
+                note={notes[t]}
+                onPress={() => setViewing(t)}
+              />
             ))}
           </Card>
         );
@@ -163,6 +173,7 @@ export default function LabsScreen() {
       />
       <TestDetail
         test={viewing}
+        name={viewing ? labName(viewing, names) : ''}
         results={viewing ? grouped.get(viewing) ?? [] : []}
         note={viewing ? notes[viewing] : undefined}
         onSaveNote={async (note) => {
@@ -171,7 +182,22 @@ export default function LabsScreen() {
           setNotes(await loadTestNotes());
         }}
         onSaveResult={async (result) => {
-          await update(labs.map((l) => (l.id === result.id ? result : l)));
+          const exists = labs.some((l) => l.id === result.id);
+          await update(exists ? labs.map((l) => (l.id === result.id ? result : l)) : [...labs, result]);
+        }}
+        onSaveSettings={async ({ name, low, high, rangeChanged }) => {
+          if (!viewing) return;
+          setNames(await setLabName(viewing, name));
+          if (rangeChanged) await update(labs.map((l) => (l.test === viewing ? { ...l, low, high } : l)));
+        }}
+        onDeleteTest={async () => {
+          if (!viewing) return;
+          const test = viewing;
+          setViewing(null);
+          await update(labs.filter((l) => l.test !== test));
+          await saveTestNote(test, null);
+          setNames(await setLabName(test, null));
+          setNotes(await loadTestNotes());
         }}
         onClose={() => setViewing(null)}
         onDelete={async (id) => {
@@ -184,7 +210,17 @@ export default function LabsScreen() {
   );
 }
 
-function TestRow({ results, note, onPress }: { results: LabResult[]; note?: TestNote; onPress: () => void }) {
+function TestRow({
+  name,
+  results,
+  note,
+  onPress,
+}: {
+  name: string;
+  results: LabResult[];
+  note?: TestNote;
+  onPress: () => void;
+}) {
   const theme = useTheme();
   const latest = results[results.length - 1];
   const prev = results[results.length - 2];
@@ -192,13 +228,20 @@ function TestRow({ results, note, onPress }: { results: LabResult[]; note?: Test
   let change = '';
   if (prev && prev.value !== 0) {
     const pct = Math.round(((latest.value - prev.value) / Math.abs(prev.value)) * 100);
-    change = pct === 0 ? 'No change' : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% since ${parseDate(prev.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
+    const prevDate = parseDate(prev.date);
+    const since = prevDate.toLocaleDateString(
+      undefined,
+      prevDate.getFullYear() === new Date().getFullYear()
+        ? { month: 'short', day: 'numeric' }
+        : { month: 'short', day: 'numeric', year: 'numeric' },
+    );
+    change = pct === 0 ? `No change since ${since}` : `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% since ${since}`;
   }
   const statusColor = status.tone === 'alert' ? theme.sunAlert : theme.textSecondary;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { borderColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 }]}>
       <View style={styles.flex}>
-        <ThemedText type="smallBold">{labName(latest.test)}</ThemedText>
+        <ThemedText type="smallBold">{name}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {change || `${results.length} result`}
         </ThemedText>

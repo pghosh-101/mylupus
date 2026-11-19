@@ -321,3 +321,56 @@ export function DayStepper({ value, onChange }: { value: string; onChange: (v: s
     </View>
   );
 }
+
+/** Bottom action sheet: a list of options plus Cancel. Works on iPhone and web. */
+export function ActionMenu({
+  visible,
+  title,
+  options,
+  onClose,
+}: {
+  visible: boolean;
+  title?: string;
+  options: { label: string; onPress: () => void; destructive?: boolean }[];
+  onClose: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={menuStyles.backdrop} onPress={onClose}>
+        <View style={[menuStyles.sheet, { backgroundColor: theme.backgroundElement }]}>
+          {title && (
+            <ThemedText type="small" themeColor="textSecondary" style={menuStyles.title}>
+              {title}
+            </ThemedText>
+          )}
+          {options.map((o) => (
+            <Pressable
+              key={o.label}
+              onPress={() => {
+                onClose();
+                o.onPress();
+              }}
+              style={({ pressed }) => [
+                menuStyles.option,
+                { borderColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 },
+              ]}>
+              <ThemedText style={{ color: o.destructive ? theme.sunAlert : theme.accent }}>{o.label}</ThemedText>
+            </Pressable>
+          ))}
+          <Pressable onPress={onClose} style={[menuStyles.option, menuStyles.cancel, { borderColor: theme.backgroundSelected }]}>
+            <ThemedText type="smallBold">Cancel</ThemedText>
+          </Pressable>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const menuStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: { paddingBottom: Spacing.five, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+  title: { textAlign: 'center', paddingVertical: Spacing.three },
+  option: { paddingVertical: Spacing.three, alignItems: 'center', borderTopWidth: 1 },
+  cancel: { marginTop: Spacing.two },
+});

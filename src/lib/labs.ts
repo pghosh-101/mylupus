@@ -169,7 +169,9 @@ export type LabResult = {
   note: string;
 };
 
-export const labName = (test: string) => testFor(test)?.name ?? test.replace(/^custom:/, '');
+/** Display name for a test: your rename if you set one, otherwise the built-in name. */
+export const labName = (test: string, names: Record<string, string> = nameOverrides) =>
+  names[test] ?? defaultLabName(test);
 
 const KEY = 'mylupus.labs';
 
@@ -288,3 +290,37 @@ export function displayStatus(results: LabResult[], note?: TestNote) {
   }
   return { label: FLAG_LABEL[flag], tone: 'alert' as const, worsening };
 }
+
+// ---------------------------------------------------------------------------
+// Custom display names (rename any test)
+// ---------------------------------------------------------------------------
+
+const NAMES_KEY = 'mylupus.labNames';
+let nameOverrides: Record<string, string> = {};
+
+/** Load renamed tests; call before rendering lab names. */
+export async function loadLabNames(): Promise<Record<string, string>> {
+  try {
+    const raw = await AsyncStorage.getItem(NAMES_KEY);
+    nameOverrides = raw ? JSON.parse(raw) : {};
+  } catch {
+    nameOverrides = {};
+  }
+  return nameOverrides;
+}
+
+export async function setLabName(test: string, name: string | null): Promise<Record<string, string>> {
+  const next = { ...nameOverrides };
+  if (name && name.trim() && name.trim() !== defaultLabName(test)) next[test] = name.trim();
+  else delete next[test];
+  nameOverrides = next;
+  try {
+    await AsyncStorage.setItem(NAMES_KEY, JSON.stringify(next));
+  } catch {
+    // Not fatal.
+  }
+  return next;
+}
+
+/** The built-in name, ignoring any rename. */
+export const defaultLabName = (test: string) => testFor(test)?.name ?? test.replace(/^custom:/, '');

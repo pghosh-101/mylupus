@@ -3,7 +3,9 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LabChart } from '@/components/labs/lab-chart';
-import { ActionButton, Input, Segmented } from '@/components/meds/controls';
+import { ResultSheet } from '@/components/labs/result-sheet';
+import { TestSettingsSheet } from '@/components/labs/test-settings-sheet';
+import { ActionButton, ActionMenu, Input, Segmented } from '@/components/meds/controls';
 import { Card } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -27,31 +29,59 @@ const longDate = (d: string) =>
 /** One test: what it is, your doctor's note, a chart over time, and every result. */
 export function TestDetail({
   test,
+  name,
   results,
   note,
   onSaveNote,
   onSaveResult,
   onDelete,
+  onSaveSettings,
+  onDeleteTest,
   onClose,
 }: {
   test: string | null;
+  /** Display name (your rename, if any). */
+  name: string;
   results: LabResult[];
   note?: TestNote;
   onSaveNote: (note: TestNote | null) => void;
+  /** Add (new id) or update (existing id) a result. */
   onSaveResult: (result: LabResult) => void;
   onDelete: (id: string) => void;
+  onSaveSettings: (s: { name: string; low: number | null; high: number | null; rangeChanged: boolean }) => void;
+  onDeleteTest: () => void;
   onClose: () => void;
 }) {
   const theme = useTheme();
   const info = test ? testFor(test) : undefined;
   const latest = results[results.length - 1];
   const status = results.length ? displayStatus(results, note) : null;
+  const [menu, setMenu] = useState(false);
+  const [editing, setEditing] = useState<LabResult | 'new' | null>(null);
+  const [settings, setSettings] = useState(false);
+
+  const confirmDeleteTest = () =>
+    Alert.alert(`Delete ${name || 'this lab'}?`, `All ${results.length} results and its doctor's note will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onDeleteTest },
+    ]);
 
   return (
     <Modal visible={test !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView edges={['top', 'bottom']} style={[styles.sheet, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
-          <ThemedText type="smallBold">{test ? labName(test) : ''}</ThemedText>
+          <ThemedText type="smallBold" numberOfLines={1} style={styles.flex}>
+            {name}
+          </ThemedText>
+          <Pressable
+            onPress={() => setMenu(true)}
+            hitSlop={10}
+            accessibilityLabel="More options"
+            style={[styles.more, { backgroundColor: theme.backgroundSelected }]}>
+            <ThemedText type="smallBold" style={{ color: theme.accent, fontSize: 18, lineHeight: 20 }}>
+              ⋯
+            </ThemedText>
+          </Pressable>
           <Pressable onPress={onClose} hitSlop={12}>
             <ThemedText type="smallBold" style={{ color: theme.accent }}>
               Done
@@ -93,13 +123,59 @@ export function TestDetail({
               ALL RESULTS ({results.length})
             </ThemedText>
             {[...results].reverse().map((r) => (
-              <ResultRow key={r.id} result={r} accepted={note?.okForMe} onSave={onSaveResult} onDelete={onDelete} />
+              <ResultRow key={r.id} result={r} accepted={note?.okForMe} onPress={() => setEditing(r)} />
             ))}
+            <ThemedText type="small" themeColor="textSecondary">
+              Tap a result to edit it. Use ⋯ to add a result.
+            </ThemedText>
           </Card>
           <ThemedText type="small" themeColor="textSecondary">
             Lab results need your doctor&apos;s interpretation. Trends over time usually matter more than a single value.
           </ThemedText>
         </ScrollView>
+
+        {test && (
+          <>
+            <ActionMenu
+              visible={menu}
+              title={name}
+              onClose={() => setMenu(false)}
+              options={[
+                { label: 'Add a result', onPress: () => setEditing('new') },
+                { label: 'Edit name & normal range', onPress: () => setSettings(true) },
+                { label: 'Delete this lab', onPress: confirmDeleteTest, destructive: true },
+              ]}
+            />
+            <ResultSheet
+              visible={editing !== null}
+              test={test}
+              name={name}
+              result={editing === 'new' ? null : editing}
+              template={latest}
+              onClose={() => setEditing(null)}
+              onSave={(r) => {
+                setEditing(null);
+                onSaveResult(r);
+              }}
+              onDelete={(id) => {
+                setEditing(null);
+                onDelete(id);
+              }}
+            />
+            <TestSettingsSheet
+              visible={settings}
+              test={test}
+              name={name}
+              low={latest?.low ?? null}
+              high={latest?.high ?? null}
+              onClose={() => setSettings(false)}
+              onSave={(next) => {
+                setSettings(false);
+                onSaveSettings(next);
+              }}
+            />
+          </>
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -192,25 +268,14 @@ function DoctorNoteCard({ note, onSave }: { note?: TestNote; onSave: (note: Test
   );
 }
 
-function ResultRow({
-  result,
-  accepted,
-  onSave,
-  onDelete,
-}: {
-  result: LabResult;
-  accepted?: boolean;
-  onSave: (r: LabResult) => void;
-  onDelete: (id: string) => void;
-}) {
+function ResultRow({ result, accepted, onPress }: { result: LabResult; accepted?: boolean; onPress: () => void }) {
   const theme = useTheme();
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(result.note);
   const flag = flagFor(result);
   const out = flag === 'low' || flag === 'high';
-
   return (
-    <View style={[styles.result, { borderColor: theme.backgroundSelected }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.result, { borderColor: theme.backgroundSelected, opacity: pressed ? 0.6 : 1 }]}>
       <View style={styles.rowBetween}>
         <View style={styles.flex}>
           <ThemedText type="smallBold">
@@ -225,43 +290,15 @@ function ResultRow({
           <ThemedText type="small" themeColor="textSecondary">
             {longDate(result.date)}
           </ThemedText>
+          {result.note ? (
+            <ThemedText type="small" style={styles.note}>
+              {result.note}
+            </ThemedText>
+          ) : null}
         </View>
-        <Pressable onPress={() => setEditing(!editing)} hitSlop={8}>
-          <ThemedText type="small" style={{ color: theme.accent }}>
-            {result.note ? 'Edit note' : 'Add note'}
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          hitSlop={8}
-          onPress={() =>
-            Alert.alert('Delete this result?', undefined, [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: () => onDelete(result.id) },
-            ])
-          }>
-          <ThemedText type="small" style={{ color: theme.sunAlert }}>
-            Delete
-          </ThemedText>
-        </Pressable>
+        <ThemedText themeColor="textSecondary">›</ThemedText>
       </View>
-      {!editing && result.note ? (
-        <ThemedText type="small" style={styles.note}>
-          {result.note}
-        </ThemedText>
-      ) : null}
-      {editing && (
-        <>
-          <Input value={text} onChangeText={setText} placeholder="e.g. Doctor said it's trending the right way" multiline />
-          <ActionButton
-            label="Save note"
-            onPress={() => {
-              onSave({ ...result, note: text.trim() });
-              setEditing(false);
-            }}
-          />
-        </>
-      )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -269,13 +306,14 @@ const styles = StyleSheet.create({
   sheet: { flex: 1 },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: Spacing.three,
     alignItems: 'center',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
   body: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.six },
   rowBetween: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  more: { width: 34, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   result: { borderTopWidth: 1, paddingTop: Spacing.two, gap: Spacing.two },
   flex: { flex: 1 },
   buttons: { flexDirection: 'row', gap: Spacing.two },
