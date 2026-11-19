@@ -43,7 +43,7 @@ export function morningMessage(day: DayProjection): { title: string; body: strin
       ? `above ${limit} from ${formatHour(day.window.start)}–${formatHour(day.window.end)}`
       : `within your limit all day`,
   );
-  return { title: `Good morning, ${Settings.name}`, body: parts.join(' · ') };
+  return { title: `Good morning, ${Settings.name}`, body: `${parts.join(' · ')}\nTap to log your sleep.` };
 }
 
 /** Local Date for the alert time on a "YYYY-MM-DD" date, in the phone's time zone. */

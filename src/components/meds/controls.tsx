@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -189,4 +190,110 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+});
+
+/** Multi-select chips. */
+export function MultiChips({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly string[];
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={chipStyles.row}>
+      {options.map((o) => {
+        const on = value.includes(o);
+        return (
+          <Pressable
+            key={o}
+            onPress={() => onChange(on ? value.filter((x) => x !== o) : [...value, o])}
+            style={[
+              chipStyles.chip,
+              {
+                backgroundColor: on ? theme.accent : theme.background,
+                borderColor: on ? theme.accent : theme.backgroundSelected,
+              },
+            ]}>
+            <ThemedText type="small" style={{ color: on ? '#fff' : theme.text, fontWeight: '600' }}>
+              {o}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Full-screen form sheet with Cancel / title / Save header and a big save button at the bottom. */
+export function FormSheet({
+  visible,
+  title,
+  saveLabel = 'Save',
+  onSave,
+  onClose,
+  children,
+}: {
+  visible: boolean;
+  title: string;
+  saveLabel?: string;
+  onSave: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const theme = useTheme();
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.backgroundElement }}>
+        <View style={chipStyles.header}>
+          <Pressable onPress={onClose} hitSlop={12}>
+            <ThemedText style={{ color: theme.accent }}>Cancel</ThemedText>
+          </Pressable>
+          <ThemedText type="smallBold" numberOfLines={1} style={chipStyles.title}>
+            {title}
+          </ThemedText>
+          <Pressable onPress={onSave} hitSlop={12}>
+            <ThemedText type="smallBold" style={{ color: theme.accent }}>
+              Save
+            </ThemedText>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={chipStyles.body} keyboardShouldPersistTaps="handled">
+          {children}
+          <ActionButton label={saveLabel} onPress={onSave} />
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Month + year stepper for "YYYY-MM" values. */
+export function MonthStepper({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [y, m] = value.split('-').map(Number);
+  const shift = (delta: number) => {
+    const d = new Date(y, m - 1 + delta, 1);
+    const now = new Date();
+    if (d.getTime() > new Date(now.getFullYear(), now.getMonth(), 1).getTime()) return;
+    onChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+  return <Stepper label={`${MONTHS[m - 1]} ${y}`} onMinus={() => shift(-1)} onPlus={() => shift(1)} />;
+}
+
+const chipStyles = StyleSheet.create({
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  chip: { paddingVertical: Spacing.one + 2, paddingHorizontal: Spacing.three, borderRadius: 999, borderWidth: 1 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+  },
+  title: { flex: 1, textAlign: 'center' },
+  body: { padding: Spacing.three, gap: Spacing.four, paddingBottom: Spacing.six },
 });

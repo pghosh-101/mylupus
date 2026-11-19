@@ -5,6 +5,7 @@ import { AppState, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
+import { scheduleEveningReminder } from '@/lib/daily';
 import { listenForDoseActions, rescheduleMedNotifications, setupDoseCategory } from '@/lib/meds';
 
 SplashScreen.preventAutoHideAsync();
@@ -17,6 +18,7 @@ export default function TabLayout() {
   useEffect(() => {
     setupDoseCategory();
     rescheduleMedNotifications().catch(() => {});
+    scheduleEveningReminder().catch(() => {});
     const stopListening = listenForDoseActions();
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') rescheduleMedNotifications().catch(() => {});

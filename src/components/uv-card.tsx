@@ -15,6 +15,7 @@ import {
   type CityResult,
   type Place,
 } from '@/lib/location';
+import { recordTodayWeather } from '@/lib/daily';
 import { scheduleMorningAlerts } from '@/lib/notifications';
 import { Settings } from '@/lib/settings';
 import {
@@ -64,6 +65,8 @@ export function UvCard() {
       const forecast = daily.status === 'fulfilled' ? daily.value : null;
       // Keep the next few morning notifications up to date (at most once an hour).
       scheduleMorningAlerts(place).catch(() => {});
+      // Save today's weather for pattern-finding (at most once an hour).
+      recordTodayWeather(place);
 
       if (live.status === 'fulfilled') {
         setState({ status: 'ready', now: live.value, forecast, place, fallbackReason: null });

@@ -97,6 +97,8 @@ export type CurrentUv = {
   updatedAt: Date;
   /** e.g. "Partly cloudy", when the source provides it. */
   condition: string | null;
+  /** Current temperature in °F, when the source provides it. */
+  tempF?: number | null;
 };
 
 /**
@@ -125,13 +127,14 @@ export async function fetchCurrentUv(latitude: number, longitude: number): Promi
       );
     }
     const data: {
-      current: { uv: number; last_updated_epoch: number; condition?: { text?: string } };
+      current: { uv: number; last_updated_epoch: number; condition?: { text?: string }; temp_f?: number };
     } = await res.json();
     return {
       uv: Math.max(0, data.current.uv),
       source: 'WeatherAPI.com',
       updatedAt: new Date(data.current.last_updated_epoch * 1000),
       condition: data.current.condition?.text ?? null,
+      tempF: data.current.temp_f ?? null,
     };
   } catch (e) {
     if (controller.signal.aborted) throw new Error('WeatherAPI.com took too long to respond.');
@@ -237,4 +240,77 @@ export async function fetchDailyProjections(
     byDate.get(date)!.push({ hour: Number(t.slice(11, 13)), uv: Math.max(0, data.hourly.uv_index[i] ?? 0) });
   });
   return [...byDate].map(([date, hours]) => summarizeDay(date, hours, threshold, alertHour, 'Open-Meteo'));
+}
+
+/** One day's weather, saved so patterns (flares, Raynaud's) can be compared with it later. */
+export type DayWeather = {
+  date: string;
+  uvMax: number | null;
+  tempMinF: number | null;
+  tempMaxF: number | null;
+  humidity: number | null;
+  /** Average sea-level pressure, millibars. */
+  pressureMb: number | null;
+  conditions: string | null;
+};
+
+/** Today's weather summary for a location (WeatherAPI.com, or Open-Meteo without a key). */
+export async function fetchTodayWeather(latitude: number, longitude: number): Promise<DayWeather> {
+  const q = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
+  if (WEATHERAPI_KEY) {
+    try {
+      const res = await fetch(
+        `https://api.weatherapi.com/v1/forecast.json?key=${encodeURIComponent(WEATHERAPI_KEY)}&q=${q}&days=1`,
+      );
+      if (res.ok) {
+        const data: {
+          forecast: {
+            forecastday: {
+              date: string;
+              day: {
+                uv?: number;
+                mintemp_f?: number;
+                maxtemp_f?: number;
+                avghumidity?: number;
+                condition?: { text?: string };
+              };
+              hour: { pressure_mb?: number }[];
+            }[];
+          };
+        } = await res.json();
+        const d = data.forecast.forecastday[0];
+        const pressures = d.hour.map((h) => h.pressure_mb).filter((p): p is number => typeof p === 'number');
+        return {
+          date: d.date,
+          uvMax: d.day.uv ?? null,
+          tempMinF: d.day.mintemp_f ?? null,
+          tempMaxF: d.day.maxtemp_f ?? null,
+          humidity: d.day.avghumidity ?? null,
+          pressureMb: pressures.length ? Math.round(pressures.reduce((a, b) => a + b, 0) / pressures.length) : null,
+          conditions: d.day.condition?.text ?? null,
+        };
+      }
+    } catch {
+      // Fall through to Open-Meteo.
+    }
+  }
+  const res = await fetch(
+    'https://api.open-meteo.com/v1/forecast' +
+      `?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}` +
+      '&daily=uv_index_max,temperature_2m_max,temperature_2m_min' +
+      '&temperature_unit=fahrenheit&timezone=auto&forecast_days=1',
+  );
+  if (!res.ok) throw new Error(`The weather service returned an error (${res.status}).`);
+  const data: {
+    daily: { time: string[]; uv_index_max: number[]; temperature_2m_max: number[]; temperature_2m_min: number[] };
+  } = await res.json();
+  return {
+    date: data.daily.time[0],
+    uvMax: data.daily.uv_index_max[0] ?? null,
+    tempMinF: data.daily.temperature_2m_min[0] ?? null,
+    tempMaxF: data.daily.temperature_2m_max[0] ?? null,
+    humidity: null,
+    pressureMb: null,
+    conditions: null,
+  };
 }

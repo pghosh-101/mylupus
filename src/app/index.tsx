@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { Card, Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
+import { CheckinCard } from '@/components/log/checkin-cards';
 import { MorningAlertCard } from '@/components/morning-alert-card';
 import { UvCard } from '@/components/uv-card';
 
@@ -19,6 +20,7 @@ export default function TodayScreen() {
 
   return (
     <Screen title={title}>
+      <CheckinCard compact />
       <UvCard />
       <MorningAlertCard />
       <Card>

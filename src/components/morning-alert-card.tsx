@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { loadSavedPlace } from '@/lib/location';
+import { scheduleEveningReminder } from '@/lib/daily';
 import {
   getNotificationPermission,
   requestNotificationPermission,
@@ -30,6 +31,7 @@ export function MorningAlertCard() {
     const status = await requestNotificationPermission();
     setPermission(status);
     if (status !== 'granted') return;
+    scheduleEveningReminder().catch(() => {});
     const place = await loadSavedPlace();
     if (!place) return setNote('Alerts will be scheduled once your UV loads.');
     try {
