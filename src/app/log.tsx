@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { CheckinCard } from '@/components/log/checkin-cards';
+import { DaySheet } from '@/components/log/day-sheet';
+import { flareDates, MonthCalendar } from '@/components/log/month-calendar';
 import { FlareForm } from '@/components/log/flare-form';
 import { HistoryForm } from '@/components/log/history-form';
 import { ActionButton } from '@/components/meds/controls';
@@ -12,7 +14,6 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   EMPTY_HISTORY,
-  lastDates,
   loadEvening,
   loadFlares,
   loadHistory,
@@ -26,7 +27,6 @@ import {
   type MedicalHistory,
   type SleepEntry,
 } from '@/lib/daily';
-import { parseDate } from '@/lib/meds';
 
 const SEVERITY = ['', 'Mild', 'Moderate', 'Severe'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -44,6 +44,7 @@ export default function LogScreen() {
   const [evening, setEvening] = useState<Record<string, EveningEntry>>({});
   const [editingFlare, setEditingFlare] = useState<Flare | 'new' | null>(null);
   const [editingHistory, setEditingHistory] = useState(false);
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const [i, f, h, s, e] = await Promise.all([
@@ -82,6 +83,8 @@ export default function LogScreen() {
     <Screen title="Daily log">
       <CheckinCard onSaved={reload} />
 
+      <MonthCalendar sleep={sleep} evening={evening} flares={flares} onPickDay={setPickedDay} />
+
       <InsightsCard insights={insights} />
 
       <Card>
@@ -99,7 +102,6 @@ export default function LogScreen() {
         <ActionButton label="Log a flare" onPress={() => setEditingFlare('new')} />
       </Card>
 
-      <RecentDays sleep={sleep} evening={evening} flares={flares} />
 
       <Card>
         <ThemedText type="smallBold" themeColor="textSecondary">
@@ -124,6 +126,14 @@ export default function LogScreen() {
           await saveFlares(next);
         }}
         onClose={() => setEditingFlare(null)}
+      />
+      <DaySheet
+        date={pickedDay}
+        sleep={pickedDay ? sleep[pickedDay] : undefined}
+        evening={pickedDay ? evening[pickedDay] : undefined}
+        inFlare={pickedDay ? flareDates(flares).has(pickedDay) : false}
+        onChanged={reload}
+        onClose={() => setPickedDay(null)}
       />
       <HistoryForm
         visible={editingHistory}
@@ -185,73 +195,6 @@ function FlareRow({ flare, onPress }: { flare: Flare; onPress: () => void }) {
         Edit
       </ThemedText>
     </Pressable>
-  );
-}
-
-/** One line per day for the last two weeks. */
-function RecentDays({
-  sleep,
-  evening,
-  flares,
-}: {
-  sleep: Record<string, SleepEntry>;
-  evening: Record<string, EveningEntry>;
-  flares: Flare[];
-}) {
-  const theme = useTheme();
-  const days = lastDates(14).reverse();
-  if (!days.some((d) => sleep[d] || evening[d])) return null;
-
-  const inFlare = (date: string) =>
-    flares.some((f) => {
-      if (f.start.length < 10) return false;
-      const start = parseDate(f.start).getTime();
-      const end = f.ongoing ? Date.now() : start + ((f.durationDays ?? 1) - 1) * 86400000;
-      const t = parseDate(date).getTime();
-      return t >= start && t <= end;
-    });
-
-  return (
-    <Card>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        LAST 2 WEEKS
-      </ThemedText>
-      {days.map((d) => {
-        const s = sleep[d];
-        const e = evening[d];
-        if (!s && !e) return null;
-        const notable = e
-          ? Object.entries(e.symptoms)
-              .filter(([, v]) => (v ?? 0) >= 2)
-              .map(([k]) => k)
-          : [];
-        const label = parseDate(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-        return (
-          <View key={d} style={[styles.row, { borderColor: theme.backgroundSelected }]}>
-            <View style={styles.flex}>
-              <ThemedText type="smallBold">
-                {label}
-                {inFlare(d) ? ' · Flare' : ''}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {[
-                  s ? `${s.hours}h sleep` : null,
-                  e ? `stress ${['none', 'mild', 'mod', 'severe'][e.stress]}` : null,
-                  e ? `${e.homeMeals} home / ${e.outMeals} out` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </ThemedText>
-              {notable.length > 0 && (
-                <ThemedText type="small" style={{ color: theme.sunAlert }}>
-                  {notable.join(', ')}
-                </ThemedText>
-              )}
-            </View>
-          </View>
-        );
-      })}
-    </Card>
   );
 }
 
