@@ -90,7 +90,7 @@ export function TestDetail({
 
           <Card>
             <ThemedText type="smallBold" themeColor="textSecondary">
-              ALL RESULTS
+              ALL RESULTS ({results.length})
             </ThemedText>
             {[...results].reverse().map((r) => (
               <ResultRow key={r.id} result={r} accepted={note?.okForMe} onSave={onSaveResult} onDelete={onDelete} />

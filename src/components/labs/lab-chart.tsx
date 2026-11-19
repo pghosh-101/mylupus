@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
+import { Segmented } from '@/components/meds/controls';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -12,19 +13,27 @@ const H = 190;
 const PAD = { left: 44, right: 14, top: 16, bottom: 26 };
 
 /** One test over time: line + points, with the reference range shaded. Tap a point for its value. */
-export function LabChart({ results, accepted }: { results: LabResult[]; accepted?: boolean }) {
+export function LabChart({ results: allResults, accepted }: { results: LabResult[]; accepted?: boolean }) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
-  const [selected, setSelected] = useState<number>(results.length - 1);
-  if (results.length === 0) return null;
+  const [range, setRange] = useState<'all' | 5 | 3>('all');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  if (allResults.length === 0) return null;
+
+  const results = range === 'all' ? allResults : allResults.slice(-range);
+  const found = results.findIndex((r) => r.id === selectedId);
+  const selected = found >= 0 ? found : results.length - 1;
+  const setSelected = (i: number) => setSelectedId(results[i].id);
 
   // Use the most recent result's range for the band.
   const latest = results[results.length - 1];
   const { low, high, unit } = latest;
 
   const values = results.map((r) => r.value);
-  let yMin = Math.min(...values, low ?? Infinity);
-  let yMax = Math.max(...values, high ?? -Infinity);
+  // Keep both edges of the normal range in view so the band never draws off the chart.
+  const edges = [low, high].filter((v): v is number => v !== null);
+  let yMin = Math.min(...values, ...edges);
+  let yMax = Math.max(...values, ...edges);
   if (yMin === yMax) {
     yMin -= 1;
     yMax += 1;
@@ -63,6 +72,19 @@ export function LabChart({ results, accepted }: { results: LabResult[]; accepted
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       accessible
       accessibilityLabel={`Chart of ${results.length} results. Latest ${formatValue(latest.value)} ${unit} on ${formatDate(parseDate(latest.date))}.`}>
+      {allResults.length > 3 && (
+        <View style={styles.filter}>
+          <Segmented
+            options={[
+              { value: 'all', label: 'All time' },
+              ...(allResults.length > 5 ? [{ value: 5 as const, label: 'Last 5' }] : []),
+              { value: 3, label: 'Last 3' },
+            ]}
+            value={range}
+            onChange={setRange}
+          />
+        </View>
+      )}
       <View style={styles.readout}>
         <ThemedText type="smallBold">
           {formatValue(sel.value)} {sel.unit}
@@ -151,5 +173,6 @@ export function LabChart({ results, accepted }: { results: LabResult[]; accepted
 }
 
 const styles = StyleSheet.create({
+  filter: { marginBottom: Spacing.two },
   readout: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: Spacing.one },
 });

@@ -1,8 +1,9 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { AddResultsForm } from '@/components/labs/add-results-form';
+import { ReviewScanForm } from '@/components/labs/review-scan-form';
 import { TestDetail } from '@/components/labs/test-detail';
 import { ActionButton } from '@/components/meds/controls';
 import { Card, Screen } from '@/components/screen';
@@ -23,7 +24,9 @@ import {
   type LabResult,
   type TestNote,
 } from '@/lib/labs';
+import { aiErrorMessage, hasAiKey, readLabReport, type ExtractedResult, type ReportImage } from '@/lib/ai';
 import { parseDate } from '@/lib/meds';
+import { photographReport, pickReportImages } from '@/lib/scan';
 
 const GROUPS = ['Lupus activity', 'Blood counts', 'Kidneys', 'Liver', 'Other'] as const;
 
@@ -32,6 +35,8 @@ export default function LabsScreen() {
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, TestNote>>({});
+  const [scanning, setScanning] = useState(false);
+  const [scan, setScan] = useState<{ results: ExtractedResult[]; notes: string } | null>(null);
 
   const reload = useCallback(async () => {
     const [l, n] = await Promise.all([loadLabs(), loadTestNotes()]);
@@ -60,9 +65,51 @@ export default function LabsScreen() {
   const dates = labs.map((l) => l.date).sort();
   const lastDraw = dates.length ? dates[dates.length - 1] : null;
 
+  const runScan = async (source: 'camera' | 'library') => {
+    try {
+      const images: ReportImage[] | null = source === 'camera' ? await photographReport() : await pickReportImages();
+      if (!images?.length) return;
+      setScanning(true);
+      setScan(await readLabReport(images));
+    } catch (e) {
+      console.warn('Lab report scan failed:', e);
+      Alert.alert("Couldn't read the report", aiErrorMessage(e));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const startScan = () => {
+    if (!hasAiKey) {
+      Alert.alert(
+        'Claude API key needed',
+        'Reading photos uses Claude. Add EXPO_PUBLIC_ANTHROPIC_API_KEY to the .env.local file on your laptop, then restart the app.',
+      );
+      return;
+    }
+    if (Platform.OS === 'web') return runScan('library');
+    Alert.alert('Scan a lab report', 'Photograph a printed report, or pick photos or screenshots (up to 5 pages).', [
+      { text: 'Take a photo', onPress: () => runScan('camera') },
+      { text: 'Choose from photos', onPress: () => runScan('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <Screen title="Labs">
-      <ActionButton label="Add lab results" onPress={() => setAdding(true)} />
+      {scanning ? (
+        <Card>
+          <ActivityIndicator />
+          <ThemedText themeColor="textSecondary" style={styles.center}>
+            Reading your report… this can take up to a minute.
+          </ThemedText>
+        </Card>
+      ) : (
+        <View style={styles.buttons}>
+          <ActionButton label="Scan a lab report" onPress={startScan} />
+          <ActionButton label="Type results in" kind="secondary" onPress={() => setAdding(true)} />
+        </View>
+      )}
 
       {labs.length === 0 ? (
         <Card>
@@ -96,6 +143,16 @@ export default function LabsScreen() {
         );
       })}
 
+      <ReviewScanForm
+        extracted={scan?.results ?? null}
+        notes={scan?.notes ?? ''}
+        existing={labs}
+        onClose={() => setScan(null)}
+        onSave={async (results) => {
+          setScan(null);
+          await update([...labs, ...results]);
+        }}
+      />
       <AddResultsForm
         visible={adding}
         onClose={() => setAdding(false)}
@@ -174,6 +231,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderTopWidth: 1, paddingTop: Spacing.two },
   flex: { flex: 1, gap: Spacing.half },
   right: { alignItems: 'flex-end', maxWidth: '45%' },
+  buttons: { gap: Spacing.two },
+  center: { textAlign: 'center' },
   status: { textAlign: 'right' },
   note: { fontStyle: 'italic' },
 });
