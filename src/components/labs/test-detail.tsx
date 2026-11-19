@@ -98,10 +98,11 @@ export function TestDetail({
           {status?.worsening && note?.okForMe && (
             <Card>
               <ThemedText type="smallBold" style={{ color: theme.sunAlert }}>
-                Rising since last test
+                {status.trend}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Your doctor said your level was OK, but it went up by more than 20% since the previous result. Worth
+                Your doctor said your level was OK, but it moved more than 20% further out of range since the previous
+                result. Worth
                 mentioning at your next visit.
               </ThemedText>
             </Card>
@@ -247,7 +248,7 @@ function DoctorNoteCard({ note, onSave }: { note?: TestNote; onSave: (note: Test
       />
       {ok && (
         <ThemedText type="small" themeColor="textSecondary">
-          No orange warning for this test. You&apos;ll still see a heads-up if it rises more than 20% between tests.
+          No orange warning for this test. You&apos;ll still see a heads-up if it moves more than 20% further out of range between tests.
         </ThemedText>
       )}
       <View style={styles.buttons}>

@@ -22,7 +22,6 @@ import {
   saveLabs,
   saveTestNote,
   setLabName,
-  testFor,
   type LabResult,
   type TestNote,
 } from '@/lib/labs';
@@ -30,15 +29,6 @@ import { aiErrorMessage, hasAiKey, readLabReport, type ExtractedResult, type Rep
 import { parseDate } from '@/lib/meds';
 import { photographReport, pickReportImages } from '@/lib/scan';
 
-const GROUPS = ['Lupus activity', 'Blood counts', 'Kidneys', 'Liver', 'Other'] as const;
-/** Heading shown for each group. Tests without a built-in category go under "Test results". */
-const GROUP_TITLE: Record<(typeof GROUPS)[number], string> = {
-  'Lupus activity': 'Lupus activity',
-  'Blood counts': 'Blood counts',
-  Kidneys: 'Kidneys',
-  Liver: 'Liver',
-  Other: 'Test results',
-};
 
 export default function LabsScreen() {
   const [labs, setLabs] = useState<LabResult[]>([]);
@@ -68,7 +58,6 @@ export default function LabsScreen() {
   };
 
   const grouped = byTest(labs);
-  const groupOf = (test: string) => testFor(test)?.group ?? 'Other';
   const tests = [...grouped.keys()].sort(
     (a, b) =>
       LAB_TESTS.findIndex((t) => t.key === a) - LAB_TESTS.findIndex((t) => t.key === b) ||
@@ -140,26 +129,22 @@ export default function LabsScreen() {
         </ThemedText>
       )}
 
-      {GROUPS.map((g) => {
-        const inGroup = tests.filter((t) => groupOf(t) === g);
-        if (!inGroup.length) return null;
-        return (
-          <Card key={g}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              {GROUP_TITLE[g].toUpperCase()}
-            </ThemedText>
-            {inGroup.map((t) => (
-              <TestRow
-                key={t}
-                name={labName(t, names)}
-                results={grouped.get(t)!}
-                note={notes[t]}
-                onPress={() => setViewing(t)}
-              />
-            ))}
-          </Card>
-        );
-      })}
+      {tests.length > 0 && (
+        <Card>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            TEST RESULTS
+          </ThemedText>
+          {tests.map((t) => (
+            <TestRow
+              key={t}
+              name={labName(t, names)}
+              results={grouped.get(t)!}
+              note={notes[t]}
+              onPress={() => setViewing(t)}
+            />
+          ))}
+        </Card>
+      )}
 
       <ReviewScanForm
         extracted={scan?.results ?? null}
@@ -255,7 +240,7 @@ function TestRow({
         </ThemedText>
         {status.worsening && (
           <ThemedText type="small" style={{ color: theme.sunAlert }}>
-            Rising since last test
+            {status.trend}
           </ThemedText>
         )}
         {note?.note ? (

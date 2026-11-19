@@ -260,7 +260,7 @@ export async function saveTestNote(test: string, note: TestNote | null) {
   }
 }
 
-/** A rise of more than this since the previous result is flagged even when the doctor said OK. */
+/** A change of more than this (further out of range) is flagged even when the doctor said OK. */
 const RISE_ALERT = 0.2;
 
 /**
@@ -280,15 +280,18 @@ export function displayStatus(results: LabResult[], note?: TestNote) {
     worsening = (flag === 'high' && change > RISE_ALERT) || (flag === 'low' && change < -RISE_ALERT);
   }
 
-  if (!out) return { label: FLAG_LABEL[flag], tone: 'normal' as const, worsening: false };
+  // How to describe a worsening change: low values dropping, or high values rising.
+  const trend = flag === 'low' ? 'Dropping since last test' : 'Rising since last test';
+  if (!out) return { label: FLAG_LABEL[flag], tone: 'normal' as const, worsening: false, trend };
   if (note?.okForMe) {
     return {
       label: `${flag === 'high' ? 'Above' : 'Below'} range · Doctor says OK`,
       tone: worsening ? ('alert' as const) : ('ok' as const),
       worsening,
+      trend,
     };
   }
-  return { label: FLAG_LABEL[flag], tone: 'alert' as const, worsening };
+  return { label: FLAG_LABEL[flag], tone: 'alert' as const, worsening, trend };
 }
 
 // ---------------------------------------------------------------------------
