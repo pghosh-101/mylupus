@@ -1,88 +1,103 @@
-import * as Location from 'expo-location';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Card } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  distanceKm,
+  getDevicePlace,
+  loadSavedPlace,
+  savePlace,
+  searchCities,
+  type CityResult,
+  type Place,
+} from '@/lib/location';
 import { Settings } from '@/lib/settings';
 import { fetchUvForecast, formatHour, uvCategory, type UvForecast } from '@/lib/uv';
 
 type State =
   | { status: 'loading'; step: string }
   | { status: 'error'; message: string }
-  | { status: 'ready'; forecast: UvForecast; place: string | null };
-
-/** Rejects with `message` if `promise` takes longer than `ms`. */
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
-}
-
-/** Fast path: a recent cached position. Otherwise ask the GPS, with a time limit. */
-async function getPosition() {
-  const cached = await Location.getLastKnownPositionAsync({ maxAge: 30 * 60 * 1000 });
-  if (cached) return cached.coords;
-  const fresh = await withTimeout(
-    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low }),
-    15000,
-    "Couldn't find your location in time. Check that Location Services are on, then try again.",
-  );
-  return fresh.coords;
-}
+  | { status: 'ready'; forecast: UvForecast; place: Place };
 
 export function UvCard() {
   const theme = useTheme();
   const threshold = Settings.uvThreshold;
-  const [state, setState] = useState<State>({ status: 'loading', step: 'Starting…' });
+  const [state, setState] = useState<State>({ status: 'loading', step: 'Loading…' });
+  const [picking, setPicking] = useState(false);
+
+  const showUvFor = useCallback(
+    async (place: Place) => {
+      const forecast = await fetchUvForecast(place.latitude, place.longitude, threshold);
+      setState({ status: 'ready', forecast, place });
+    },
+    [threshold],
+  );
 
   const load = useCallback(async () => {
     try {
-      setState({ status: 'loading', step: 'Checking location permission…' });
-      const perm = await Location.requestForegroundPermissionsAsync();
-      if (perm.status !== 'granted') {
-        setState({
-          status: 'error',
-          message:
-            'MyLupus needs your location to look up the UV index where you are. Turn it on in Settings > Privacy & Security > Location Services > Expo Go.',
-        });
+      const saved = await loadSavedPlace();
+
+      if (saved) {
+        // Show UV for the last place right away; no waiting on location.
+        setState({ status: 'loading', step: "Getting today's UV forecast…" });
+        await showUvFor(saved);
+
+        // Then quietly check whether the phone has moved somewhere else.
+        if (saved.source === 'device') {
+          getDevicePlace(false)
+            .then(async (here) => {
+              if (distanceKm(saved, here) > 10 || (!saved.name && here.name)) {
+                await savePlace(here);
+                await showUvFor(here);
+              }
+            })
+            .catch(() => {});
+        }
         return;
       }
 
+      // First launch: we need a location before we can show anything.
       setState({ status: 'loading', step: 'Finding your location…' });
-      const { latitude, longitude } = await getPosition();
-
+      const here = await getDevicePlace(true);
+      await savePlace(here);
       setState({ status: 'loading', step: "Getting today's UV forecast…" });
-      const forecast = await fetchUvForecast(latitude, longitude, threshold);
-      setState({ status: 'ready', forecast, place: null });
-
-      // Place name is a nice-to-have: look it up after the UV is already showing.
-      withTimeout(Location.reverseGeocodeAsync({ latitude, longitude }), 5000, 'timeout')
-        .then(([addr]) => {
-          const place = addr?.city ?? addr?.region ?? null;
-          if (place) setState((s) => (s.status === 'ready' ? { ...s, place } : s));
-        })
-        .catch(() => {});
+      await showUvFor(here);
     } catch (e) {
       setState({ status: 'error', message: e instanceof Error ? e.message : 'Something went wrong.' });
     }
-  }, [threshold]);
+  }, [showUvFor]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const choosePlace = async (place: Place | 'device') => {
+    setPicking(false);
+    try {
+      setState({
+        status: 'loading',
+        step: place === 'device' ? 'Finding your location…' : "Getting today's UV forecast…",
+      });
+      const chosen = place === 'device' ? await getDevicePlace(true) : place;
+      await savePlace(chosen);
+      await showUvFor(chosen);
+    } catch (e) {
+      setState({ status: 'error', message: e instanceof Error ? e.message : 'Something went wrong.' });
+    }
+  };
+
+  if (picking) {
+    return (
+      <CityPicker
+        onPick={(city) => choosePlace(city)}
+        onUseDevice={() => choosePlace('device')}
+        onCancel={() => setPicking(false)}
+      />
+    );
+  }
 
   if (state.status === 'loading') {
     return (
@@ -100,20 +115,29 @@ export function UvCard() {
       <Card>
         <ThemedText type="smallBold">Couldn&apos;t load UV</ThemedText>
         <ThemedText themeColor="textSecondary">{state.message}</ThemedText>
-        <RetryButton onPress={load} />
+        <View style={styles.buttonRow}>
+          <Button label="Try again" onPress={load} />
+          <Button label="Pick a city" onPress={() => setPicking(true)} secondary />
+        </View>
       </Card>
     );
   }
 
   const { forecast, place } = state;
   const needsProtection = forecast.current > threshold;
+  const placeLabel = place.name ?? (place.source === 'device' ? 'Your location' : 'Selected city');
 
   return (
     <Card>
       <View style={styles.headerRow}>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          UV INDEX{place ? ` · ${place.toUpperCase()}` : ''}
-        </ThemedText>
+        <Pressable onPress={() => setPicking(true)} hitSlop={12} style={styles.placeButton}>
+          <ThemedText type="smallBold" themeColor="textSecondary" numberOfLines={1}>
+            UV INDEX · {placeLabel.toUpperCase()}
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.accent }}>
+            Change
+          </ThemedText>
+        </Pressable>
         <Pressable onPress={load} hitSlop={12}>
           <ThemedText type="small" style={{ color: theme.accent }}>
             Refresh
@@ -197,12 +221,93 @@ function UvChart({ forecast, threshold }: { forecast: UvForecast; threshold: num
   );
 }
 
-function RetryButton({ onPress }: { onPress: () => void }) {
+function CityPicker({
+  onPick,
+  onUseDevice,
+  onCancel,
+}: {
+  onPick: (city: CityResult) => void;
+  onUseDevice: () => void;
+  onCancel: () => void;
+}) {
+  const theme = useTheme();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<CityResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const search = async () => {
+    if (query.trim().length < 2) return;
+    setSearching(true);
+    setError(null);
+    try {
+      setResults(await searchCities(query));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Search failed.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  return (
+    <Card>
+      <View style={styles.headerRow}>
+        <ThemedText type="smallBold" themeColor="textSecondary">
+          CHOOSE A PLACE
+        </ThemedText>
+        <Pressable onPress={onCancel} hitSlop={12}>
+          <ThemedText type="small" style={{ color: theme.accent }}>
+            Cancel
+          </ThemedText>
+        </Pressable>
+      </View>
+
+      <Pressable onPress={onUseDevice} style={[styles.option, { backgroundColor: theme.backgroundSelected }]}>
+        <ThemedText type="smallBold">Use my current location</ThemedText>
+      </Pressable>
+
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        onSubmitEditing={search}
+        placeholder="Search for a city"
+        placeholderTextColor={theme.textSecondary}
+        returnKeyType="search"
+        autoCorrect={false}
+        style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
+      />
+
+      {searching && <ActivityIndicator />}
+      {error && <ThemedText themeColor="textSecondary">{error}</ThemedText>}
+      {results?.length === 0 && <ThemedText themeColor="textSecondary">No cities found.</ThemedText>}
+      {results?.map((city) => (
+        <Pressable
+          key={`${city.latitude},${city.longitude}`}
+          onPress={() => onPick(city)}
+          style={[styles.option, { backgroundColor: theme.backgroundSelected }]}>
+          <ThemedText>{city.label}</ThemedText>
+        </Pressable>
+      ))}
+    </Card>
+  );
+}
+
+function Button({
+  label,
+  onPress,
+  secondary,
+}: {
+  label: string;
+  onPress: () => void;
+  secondary?: boolean;
+}) {
   const theme = useTheme();
   return (
-    <Pressable onPress={onPress} style={[styles.button, { backgroundColor: theme.accent }]}>
-      <ThemedText type="smallBold" style={{ color: '#fff' }}>
-        Try again
+    <Pressable
+      onPress={onPress}
+      style={[styles.button, { backgroundColor: secondary ? theme.backgroundSelected : theme.accent }]}>
+      <ThemedText type="smallBold" style={{ color: secondary ? theme.text : '#fff' }}>
+        {label}
       </ThemedText>
     </Pressable>
   );
@@ -210,7 +315,8 @@ function RetryButton({ onPress }: { onPress: () => void }) {
 
 const styles = StyleSheet.create({
   center: { textAlign: 'center' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.two },
+  placeButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexShrink: 1 },
   nowRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   bigNumber: { fontSize: 56, lineHeight: 64, fontWeight: '700' },
   nowText: { flex: 1, gap: Spacing.half },
@@ -225,10 +331,18 @@ const styles = StyleSheet.create({
   barSlot: { flex: 1, justifyContent: 'flex-end' },
   bar: { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   axisRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.one },
+  buttonRow: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },
   button: {
-    alignSelf: 'flex-start',
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
     borderRadius: 12,
+  },
+  option: { padding: Spacing.three, borderRadius: 12 },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    fontSize: 16,
   },
 });
