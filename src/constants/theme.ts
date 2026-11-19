@@ -4,30 +4,30 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#10241B',
-    background: '#F7F4EC',
-    backgroundElement: '#EDE8DA',
-    backgroundSelected: '#E1DAC6',
-    textSecondary: '#56665C',
-    /** Brand accent: deep evergreen in light mode, gold in dark mode. */
-    accent: '#1E5C44',
+    text: '#0A1A12',
+    background: '#F6F8F6',
+    backgroundElement: '#E9EFEA',
+    backgroundSelected: '#DAE5DD',
+    textSecondary: '#4E6056',
+    /** Brand accent: emerald. */
+    accent: '#0B7A48',
     /** Text and icons drawn on top of the accent color. */
-    onAccent: '#F7E7B8',
+    onAccent: '#FFFFFF',
     /** UV above your threshold, and out-of-range results. */
-    sunAlert: '#A93424',
+    sunAlert: '#B03A1E',
     /** UV at or below your threshold. */
-    sunCalm: '#CFC8B4',
+    sunCalm: '#C9D4CC',
   },
   dark: {
-    text: '#EEF3EF',
-    background: '#07120E',
-    backgroundElement: '#0F1F18',
-    backgroundSelected: '#1A3026',
-    textSecondary: '#A3B6AA',
-    accent: '#D9B45F',
-    onAccent: '#1A1405',
-    sunAlert: '#F26B5B',
-    sunCalm: '#213529',
+    text: '#F3F6F4',
+    background: '#000000',
+    backgroundElement: '#0E1411',
+    backgroundSelected: '#18221C',
+    textSecondary: '#A0ADA5',
+    accent: '#22C57A',
+    onAccent: '#00140A',
+    sunAlert: '#FF8D5C',
+    sunCalm: '#232E28',
   },
 } as const;
 
