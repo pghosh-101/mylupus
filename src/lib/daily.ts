@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { success } from '@/lib/haptics';
 import type { Place } from '@/lib/location';
 import { loadDoseLog, loadMeds, todayString } from '@/lib/meds';
 import { getNotificationPermission } from '@/lib/notifications';
@@ -142,12 +143,14 @@ export const loadHistory = () => read<MedicalHistory>(KEYS.history, EMPTY_HISTOR
 export const loadWeatherLog = () => read<Record<string, DayWeather>>(KEYS.weather, {});
 
 export async function saveSleep(entry: SleepEntry) {
+  success();
   const all = await loadSleep();
   all[entry.date] = entry;
   await write(KEYS.sleep, all);
 }
 
 export async function saveEvening(entry: EveningEntry) {
+  success();
   const all = await loadEvening();
   all[entry.date] = entry;
   await write(KEYS.evening, all);

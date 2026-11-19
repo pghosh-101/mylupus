@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CardHeader } from '@/components/card-header';
 import { LabChart } from '@/components/labs/lab-chart';
 import { ResultSheet } from '@/components/labs/result-sheet';
 import { TestSettingsSheet } from '@/components/labs/test-settings-sheet';
@@ -132,9 +133,7 @@ export function TestDetail({
           {test && <DoctorNoteCard key={test} note={note} onSave={onSaveNote} />}
 
           <Card>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              ALL RESULTS ({results.length})
-            </ThemedText>
+            <CardHeader icon="list.bullet" title={`ALL RESULTS (${results.length})`} />
             {[...results].reverse().map((r) => (
               <ResultRow key={r.id} result={r} accepted={note?.okForMe} onPress={() => setEditing(r)} />
             ))}
@@ -209,9 +208,7 @@ function DoctorNoteCard({ note, onSave }: { note?: TestNote; onSave: (note: Test
     return (
       <Card>
         <View style={styles.rowBetween}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            DOCTOR&apos;S NOTE
-          </ThemedText>
+          <CardHeader icon="stethoscope" title="DOCTOR'S NOTE" />
           <Pressable onPress={() => setEditing(true)} hitSlop={8}>
             <ThemedText type="small" style={{ color: theme.accent }}>
               {note ? 'Edit' : 'Add'}
@@ -238,9 +235,7 @@ function DoctorNoteCard({ note, onSave }: { note?: TestNote; onSave: (note: Test
 
   return (
     <Card>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        DOCTOR&apos;S NOTE
-      </ThemedText>
+      <CardHeader icon="stethoscope" title="DOCTOR'S NOTE" />
       <Input
         value={text}
         onChangeText={setText}

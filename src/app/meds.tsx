@@ -2,6 +2,8 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 
+import { tap } from '@/lib/haptics';
+import { CardHeader } from '@/components/card-header';
 import { ActionButton } from '@/components/meds/controls';
 import { MedForm } from '@/components/meds/med-form';
 import { RoutineForm } from '@/components/meds/routine-form';
@@ -154,9 +156,7 @@ function TodaysDoses({
   return (
     <Card>
       <View style={styles.rowBetween}>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          TODAY
-        </ThemedText>
+        <CardHeader icon="checklist" title="TODAY" />
         <ThemedText type="small" themeColor="textSecondary">
           {done} of {doses.length} done
         </ThemedText>
@@ -279,7 +279,10 @@ function SmallButton({ label, onPress, primary }: { label: string; onPress: () =
   const theme = useTheme();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        tap();
+        onPress();
+      }}
       style={({ pressed }) => [
         styles.small,
         { backgroundColor: primary ? theme.accent : theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },

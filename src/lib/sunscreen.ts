@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { success } from '@/lib/haptics';
 import type { Place } from '@/lib/location';
 import { getNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
 import { Settings } from '@/lib/settings';
@@ -77,6 +78,7 @@ const localDate = (d: Date) =>
  */
 export async function applySunscreen(place: Place): Promise<{ state: SunscreenState; message: string }> {
   const now = Date.now();
+  success();
   await logEvent({ type: 'applied', at: now });
   await cancelReminder();
 

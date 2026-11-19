@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { CardHeader } from '@/components/card-header';
 import { ActionButton } from '@/components/meds/controls';
 import { TakenSheet } from '@/components/meds/taken-sheet';
 import { Card } from '@/components/screen';
@@ -92,9 +93,7 @@ export function NextDoseCard() {
   if (doses.length === 0) {
     return (
       <Card>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          MEDICATIONS
-        </ThemedText>
+        <CardHeader icon="pills.fill" title="MEDICATIONS" />
         <ThemedText>Add your medications to see your next dose here.</ThemedText>
         <ActionButton label="Add medications" kind="secondary" onPress={() => router.navigate('/meds')} />
       </Card>
@@ -107,16 +106,17 @@ export function NextDoseCard() {
 
   return (
     <Card>
-      <View style={styles.header}>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          {next ? 'NEXT DOSE' : 'MEDICATIONS'}
-        </ThemedText>
-        <Pressable onPress={() => router.navigate('/meds')} hitSlop={8}>
-          <ThemedText type="small" style={{ color: theme.accent }}>
-            All meds ›
-          </ThemedText>
-        </Pressable>
-      </View>
+      <CardHeader
+        icon="pills.fill"
+        title={next ? 'NEXT DOSE' : 'MEDICATIONS'}
+        right={
+          <Pressable onPress={() => router.navigate('/meds')} hitSlop={8}>
+            <ThemedText type="small" style={{ color: theme.accent }}>
+              All meds ›
+            </ThemedText>
+          </Pressable>
+        }
+      />
 
       <View style={styles.body}>
         <DoseRing done={done} total={doses.length} />

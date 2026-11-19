@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { CardHeader } from '@/components/card-header';
 import { CheckinCard } from '@/components/log/checkin-cards';
 import { DaySheet } from '@/components/log/day-sheet';
 import { flareDates, MonthCalendar } from '@/components/log/month-calendar';
@@ -88,9 +89,7 @@ export default function LogScreen() {
       <InsightsCard insights={insights} />
 
       <Card>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          FLARES
-        </ThemedText>
+        <CardHeader icon="flame.fill" title="FLARES" />
         {sortedFlares.length === 0 && (
           <ThemedText type="small" themeColor="textSecondary">
             Log current flares as they happen, and add past ones to give the patterns more history.
@@ -104,9 +103,7 @@ export default function LogScreen() {
 
 
       <Card>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          MY HISTORY
-        </ThemedText>
+        <CardHeader icon="doc.text.fill" title="MY HISTORY" />
         <ThemedText type="small" themeColor="textSecondary">
           {historyFilled
             ? 'Diagnosis, past medications, and other notes saved.'
@@ -154,9 +151,7 @@ function InsightsCard({ insights }: { insights: Insight[] }) {
   const color = { focus: theme.sunAlert, good: theme.accent, info: theme.textSecondary };
   return (
     <Card>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        THIS WEEK
-      </ThemedText>
+      <CardHeader icon="sparkles" title="THIS WEEK" />
       {insights.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           Patterns show up here after a few days of check-ins.

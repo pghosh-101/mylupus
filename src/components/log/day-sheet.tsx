@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CardHeader } from '@/components/card-header';
 import { EveningForm } from '@/components/log/evening-form';
 import { SleepForm } from '@/components/log/sleep-form';
 import { ActionButton } from '@/components/meds/controls';
@@ -87,17 +88,13 @@ export function DaySheet({
           )}
 
           <Card>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              SLEEP
-            </ThemedText>
+            <CardHeader icon="bed.double.fill" title="SLEEP" />
             <ThemedText>{sleep ? `${sleep.hours} hours · ${sleep.quality === 'ok' ? 'OK' : sleep.quality}` : 'Not logged'}</ThemedText>
             <ActionButton label={sleep ? 'Edit sleep' : 'Add sleep'} kind="secondary" onPress={() => setForm('sleep')} />
           </Card>
 
           <Card>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              CHECK-IN
-            </ThemedText>
+            <CardHeader icon="checkmark.circle.fill" title="CHECK-IN" />
             {evening ? (
               <>
                 <ThemedText>{symptoms.length ? symptoms.join(', ') : 'No symptoms'}</ThemedText>
@@ -119,17 +116,13 @@ export function DaySheet({
           </Card>
 
           <Card>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              MEDICATIONS
-            </ThemedText>
+            <CardHeader icon="pills.fill" title="MEDICATIONS" />
             {doses.length ? doses.map((d) => <ThemedText key={d} type="small">{d}</ThemedText>) : <ThemedText>Nothing logged</ThemedText>}
           </Card>
 
           {weather && (
             <Card>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                WEATHER
-              </ThemedText>
+              <CardHeader icon="cloud.sun.fill" title="WEATHER" />
               <ThemedText type="small">
                 {[
                   weather.uvMax != null ? `Max UV ${weather.uvMax}` : null,

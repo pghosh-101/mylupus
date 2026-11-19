@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { success } from '@/lib/haptics';
 import { getNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
 
 // ---------------------------------------------------------------------------
@@ -245,6 +246,7 @@ export const doseKey = (date: string, medId: string, doseIndex: number) => `${da
 
 /** Record a dose. `at` is when it was actually taken (defaults to now). */
 export async function logDose(key: string, status: DoseStatus, at = Date.now()) {
+  if (status === 'taken') success();
   const log = await loadDoseLog();
   const next = log.filter((e) => e.key !== key);
   next.push({ key, status, at });

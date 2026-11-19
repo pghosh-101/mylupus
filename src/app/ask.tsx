@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CardHeader } from '@/components/card-header';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -163,9 +164,7 @@ export default function AskScreen() {
                     (about 1–3¢, a few cents more when I search the web).
                   </ThemedText>
                 </View>
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  TRY ASKING
-                </ThemedText>
+                <CardHeader icon="bubble.left.and.bubble.right.fill" title="TRY ASKING" />
                 {STARTERS.map((q) => (
                   <Pressable
                     key={q}

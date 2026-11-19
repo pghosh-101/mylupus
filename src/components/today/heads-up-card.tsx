@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { CardHeader } from '@/components/card-header';
 import { Card } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -65,9 +66,7 @@ export function HeadsUpCard() {
 
   return (
     <Card>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        HEADS UP
-      </ThemedText>
+      <CardHeader icon="exclamationmark.circle.fill" title="HEADS UP" />
       {items.map((i) => (
         <Pressable
           key={i.key}

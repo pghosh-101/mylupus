@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { tap } from '@/lib/haptics';
+import { CardHeader } from '@/components/card-header';
 import { Card } from '@/components/screen';
 import { SunscreenRow } from '@/components/sunscreen-row';
 import { ThemedText } from '@/components/themed-text';
@@ -204,9 +206,7 @@ export function UvCard() {
     <Card>
       <View style={styles.headerRow}>
         <View style={styles.placeName}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            UV RIGHT NOW
-          </ThemedText>
+          <CardHeader icon="sun.max.fill" title="UV RIGHT NOW" />
           <ThemedText type="smallBold" numberOfLines={1}>
             {placeLabel}
           </ThemedText>
@@ -347,9 +347,7 @@ function CityPicker({
   return (
     <Card>
       <View style={styles.headerRow}>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          CHOOSE A PLACE
-        </ThemedText>
+        <CardHeader icon="mappin.and.ellipse" title="CHOOSE A PLACE" />
         <Pressable onPress={onCancel} hitSlop={12}>
           <ThemedText type="small" style={{ color: theme.accent }}>
             Cancel
@@ -392,7 +390,10 @@ function Pill({ label, onPress }: { label: string; onPress: () => void }) {
   const theme = useTheme();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        tap();
+        onPress();
+      }}
       hitSlop={4}
       style={({ pressed }) => [
         styles.pill,
@@ -417,7 +418,10 @@ function Button({
   const theme = useTheme();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        tap();
+        onPress();
+      }}
       style={[styles.button, { backgroundColor: secondary ? theme.backgroundSelected : theme.accent }]}>
       <ThemedText type="button" style={{ color: secondary ? theme.text : theme.onAccent }}>
         {label}

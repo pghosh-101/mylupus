@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { CardHeader } from '@/components/card-header';
 import { AddResultsForm } from '@/components/labs/add-results-form';
 import { ReviewScanForm } from '@/components/labs/review-scan-form';
 import { TestDetail } from '@/components/labs/test-detail';
@@ -132,9 +133,7 @@ export default function LabsScreen() {
 
       {tests.length > 0 && (
         <Card>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            TEST RESULTS
-          </ThemedText>
+          <CardHeader icon="chart.xyaxis.line" title="TEST RESULTS" />
           {tests.map((t) => (
             <TestRow
               key={t}

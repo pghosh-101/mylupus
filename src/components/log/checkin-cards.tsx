@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { CardHeader } from '@/components/card-header';
 import { EveningForm } from '@/components/log/evening-form';
 import { SleepForm } from '@/components/log/sleep-form';
 import { ActionButton } from '@/components/meds/controls';
@@ -74,9 +75,7 @@ export function CheckinCard({
 
   return (
     <Card>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        {compact ? 'CHECK IN' : 'TODAY'}
-      </ThemedText>
+      <CardHeader icon="checkmark.circle.fill" title={compact ? 'CHECK IN' : 'TODAY'} />
 
       {showSleep && (
         <Row

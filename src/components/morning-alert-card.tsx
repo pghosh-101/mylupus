@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { tap } from '@/lib/haptics';
+import { CardHeader } from '@/components/card-header';
 import { Card } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -57,9 +59,7 @@ export function MorningAlertCard() {
 
   return (
     <Card>
-      <ThemedText type="smallBold" themeColor="textSecondary">
-        MORNING UV ALERT
-      </ThemedText>
+      <CardHeader icon="bell.fill" title="MORNING UV ALERT" />
       <ThemedText>
         {permission === 'granted'
           ? `On · every day at ${timeLabel}`
@@ -94,7 +94,10 @@ function SmallButton({ label, onPress, primary }: { label: string; onPress: () =
   const theme = useTheme();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        tap();
+        onPress();
+      }}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: primary ? theme.accent : theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },

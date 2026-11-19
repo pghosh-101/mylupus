@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { select, tap } from '@/lib/haptics';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -67,7 +68,10 @@ function StepButton({ text, onPress }: { text: string; onPress: () => void }) {
   const theme = useTheme();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        select();
+        onPress();
+      }}
       hitSlop={4}
       style={({ pressed }) => [
         styles.stepButton,
@@ -115,7 +119,10 @@ export function Segmented<T extends string | number>({
         return (
           <Pressable
             key={String(o.value)}
-            onPress={() => onChange(o.value)}
+            onPress={() => {
+              select();
+              onChange(o.value);
+            }}
             style={[
               styles.seg,
               {
@@ -149,11 +156,14 @@ export function ActionButton({
   const fg = kind === 'primary' ? theme.onAccent : kind === 'danger' ? theme.sunAlert : theme.accent;
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        tap();
+        onPress();
+      }}
       disabled={disabled}
       style={({ pressed }) => [
         styles.action,
-        { backgroundColor: bg, opacity: disabled ? 0.5 : pressed ? 0.7 : 1 },
+        { backgroundColor: bg, opacity: disabled ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
       ]}>
       <ThemedText type="button" style={{ color: fg }}>
         {label}
@@ -210,7 +220,10 @@ export function MultiChips({
         return (
           <Pressable
             key={o}
-            onPress={() => onChange(on ? value.filter((x) => x !== o) : [...value, o])}
+            onPress={() => {
+              select();
+              onChange(on ? value.filter((x) => x !== o) : [...value, o]);
+            }}
             style={[
               chipStyles.chip,
               {
