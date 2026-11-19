@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Card } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -15,26 +15,89 @@ import {
   type Place,
 } from '@/lib/location';
 import { Settings } from '@/lib/settings';
-import { fetchUvForecast, formatHour, uvCategory, type UvForecast } from '@/lib/uv';
+import {
+  fetchCurrentUv,
+  fetchUvForecast,
+  formatHour,
+  formatTime,
+  hasWeatherApiKey,
+  uvCategory,
+  type CurrentUv,
+  type UvForecast,
+} from '@/lib/uv';
+
+/** How often to refresh the reading while the app is open. */
+const REFRESH_MS = 15 * 60 * 1000;
 
 type State =
   | { status: 'loading'; step: string }
   | { status: 'error'; message: string }
-  | { status: 'ready'; forecast: UvForecast; place: Place };
+  | {
+      status: 'ready';
+      now: CurrentUv;
+      /** Today's hourly forecast, if Open-Meteo answered. */
+      forecast: UvForecast | null;
+      /** Set when the live source failed and we fell back to the forecast. */
+      fallbackReason: string | null;
+      place: Place;
+    };
 
 export function UvCard() {
   const theme = useTheme();
   const threshold = Settings.uvThreshold;
   const [state, setState] = useState<State>({ status: 'loading', step: 'Loading…' });
   const [picking, setPicking] = useState(false);
+  const [showForecast, setShowForecast] = useState(false);
+  const placeRef = useRef<Place | null>(null);
 
   const showUvFor = useCallback(
     async (place: Place) => {
-      const forecast = await fetchUvForecast(place.latitude, place.longitude, threshold);
-      setState({ status: 'ready', forecast, place });
+      placeRef.current = place;
+      const [live, daily] = await Promise.allSettled([
+        hasWeatherApiKey
+          ? fetchCurrentUv(place.latitude, place.longitude)
+          : Promise.reject(new Error('no key')),
+        fetchUvForecast(place.latitude, place.longitude, threshold),
+      ]);
+      const forecast = daily.status === 'fulfilled' ? daily.value : null;
+
+      if (live.status === 'fulfilled') {
+        setState({ status: 'ready', now: live.value, forecast, place, fallbackReason: null });
+        return;
+      }
+      if (!forecast) throw daily.status === 'rejected' ? daily.reason : live.reason;
+
+      setState({
+        status: 'ready',
+        now: { uv: forecast.current, source: 'Open-Meteo forecast', updatedAt: new Date(), condition: null },
+        forecast,
+        place,
+        fallbackReason: hasWeatherApiKey
+          ? live.reason instanceof Error
+            ? live.reason.message
+            : 'WeatherAPI.com is unavailable.'
+          : null,
+      });
     },
     [threshold],
   );
+
+  /** Re-check UV for the current place without showing a loading screen. */
+  const refreshQuietly = useCallback(() => {
+    if (placeRef.current) showUvFor(placeRef.current).catch(() => {});
+  }, [showUvFor]);
+
+  // Keep the reading fresh: every 15 minutes, and whenever you come back to the app.
+  useEffect(() => {
+    const timer = setInterval(refreshQuietly, REFRESH_MS);
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refreshQuietly();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [refreshQuietly]);
 
   const load = useCallback(async () => {
     try {
@@ -42,7 +105,7 @@ export function UvCard() {
 
       if (saved) {
         // Show UV for the last place right away; no waiting on location.
-        setState({ status: 'loading', step: "Getting today's UV forecast…" });
+        setState({ status: 'loading', step: 'Checking the UV right now…' });
         await showUvFor(saved);
 
         // Then quietly check whether the phone has moved somewhere else.
@@ -63,7 +126,7 @@ export function UvCard() {
       setState({ status: 'loading', step: 'Finding your location…' });
       const here = await getDevicePlace(true);
       await savePlace(here);
-      setState({ status: 'loading', step: "Getting today's UV forecast…" });
+      setState({ status: 'loading', step: 'Checking the UV right now…' });
       await showUvFor(here);
     } catch (e) {
       setState({ status: 'error', message: e instanceof Error ? e.message : 'Something went wrong.' });
@@ -79,7 +142,7 @@ export function UvCard() {
     try {
       setState({
         status: 'loading',
-        step: place === 'device' ? 'Finding your location…' : "Getting today's UV forecast…",
+        step: place === 'device' ? 'Finding your location…' : 'Checking the UV right now…',
       });
       const chosen = place === 'device' ? await getDevicePlace(true) : place;
       await savePlace(chosen);
@@ -123,16 +186,19 @@ export function UvCard() {
     );
   }
 
-  const { forecast, place } = state;
-  const needsProtection = forecast.current > threshold;
+  const { now, forecast, place, fallbackReason } = state;
+  const needsProtection = now.uv > threshold;
   const placeLabel = place.name ?? (place.source === 'device' ? 'Your location' : 'Selected city');
+  const sourceLine = [`Updated ${formatTime(now.updatedAt)}`, now.source, now.condition]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <Card>
       <View style={styles.headerRow}>
         <View style={styles.placeName}>
           <ThemedText type="smallBold" themeColor="textSecondary">
-            UV INDEX
+            UV RIGHT NOW
           </ThemedText>
           <ThemedText type="smallBold" numberOfLines={1}>
             {placeLabel}
@@ -146,30 +212,51 @@ export function UvCard() {
 
       <View style={styles.nowRow}>
         <ThemedText style={[styles.bigNumber, { color: needsProtection ? theme.sunAlert : theme.text }]}>
-          {forecast.current.toFixed(1)}
+          {now.uv.toFixed(1)}
         </ThemedText>
         <View style={styles.nowText}>
           <ThemedText type="smallBold">
-            {needsProtection ? 'Above your limit right now' : 'Within your limit right now'}
+            {needsProtection ? 'Above your limit' : 'Within your limit'}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {needsProtection
               ? 'Sunscreen, hat, and shade before heading out.'
               : `At or below your limit of ${threshold}.`}{' '}
-            ({uvCategory(forecast.current)} on the standard UV scale.)
+            ({uvCategory(now.uv)} on the standard UV scale.)
           </ThemedText>
         </View>
       </View>
 
-      <ThemedText>
-        {forecast.window
-          ? `UV is above ${threshold} from about ${formatHour(forecast.window.start)} to ${formatHour(
-              forecast.window.end,
-            )} today. Peak ${forecast.max.toFixed(1)} at ${formatHour(forecast.peakHour)}.`
-          : `UV stays at or below ${threshold} all day (peak ${forecast.max.toFixed(1)}). Clouds don't block all UV, though.`}
+      <ThemedText type="small" themeColor="textSecondary">
+        {sourceLine}
       </ThemedText>
+      {fallbackReason && (
+        <ThemedText type="small" themeColor="textSecondary">
+          Live reading unavailable ({fallbackReason}), so this is an estimate from the forecast.
+        </ThemedText>
+      )}
 
-      <UvChart forecast={forecast} threshold={threshold} />
+      {forecast && (
+        <>
+          <Pressable onPress={() => setShowForecast((v) => !v)} hitSlop={8}>
+            <ThemedText type="small" style={{ color: theme.accent }}>
+              {showForecast ? "Hide today's forecast" : "Show today's forecast"}
+            </ThemedText>
+          </Pressable>
+          {showForecast && (
+            <>
+              <ThemedText>
+                {forecast.window
+                  ? `Forecast: UV above ${threshold} from about ${formatHour(forecast.window.start)} to ${formatHour(
+                      forecast.window.end,
+                    )}, peaking at ${forecast.max.toFixed(1)} around ${formatHour(forecast.peakHour)}.`
+                  : `Forecast: UV stays at or below ${threshold} all day (peak ${forecast.max.toFixed(1)}).`}
+              </ThemedText>
+              <UvChart forecast={forecast} threshold={threshold} />
+            </>
+          )}
+        </>
+      )}
     </Card>
   );
 }
