@@ -41,11 +41,11 @@ const styles = StyleSheet.create({
     fontFamily: HeadingFont.bold,
     letterSpacing: -0.3,
   },
-  /** Button labels. */
+  /** Button labels: the system font in bold, same as before the font change. */
   button: {
     fontSize: 14,
     lineHeight: 20,
-    fontFamily: HeadingFont.semibold,
+    fontWeight: 700,
   },
   link: {
     lineHeight: 30,
