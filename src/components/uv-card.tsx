@@ -207,15 +207,14 @@ export function UvCard() {
       <View style={styles.headerRow}>
         <View style={styles.placeName}>
           <CardHeader icon="sun.max.fill" title="UV RIGHT NOW" />
-          <ThemedText type="smallBold" numberOfLines={1}>
-            {placeLabel}
-          </ThemedText>
         </View>
         <View style={styles.pillRow}>
           <Pill label="Change" onPress={() => setPicking(true)} />
           <Pill label="Refresh" onPress={load} />
         </View>
       </View>
+      {/* The place gets its own full-width line so long city names are never cut off. */}
+      <ThemedText type="smallBold">{placeLabel}</ThemedText>
 
       <View style={styles.nowRow}>
         <ThemedText style={[styles.bigNumber, { color: needsProtection ? theme.sunAlert : theme.text }]}>
