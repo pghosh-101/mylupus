@@ -157,6 +157,8 @@ export type DayProjection = {
   peakHour: number;
   /** First and last hour above the threshold, or null if UV stays within it all day. */
   window: { start: number; end: number } | null;
+  /** All hourly values for the day. */
+  hours: UvHour[];
   source: string;
 };
 
@@ -176,6 +178,7 @@ function summarizeDay(
     max: peak.uv,
     peakHour: peak.hour,
     window: above.length ? { start: above[0].hour, end: above[above.length - 1].hour } : null,
+    hours,
     source,
   };
 }

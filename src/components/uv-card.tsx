@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Card } from '@/components/screen';
+import { SunscreenRow } from '@/components/sunscreen-row';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -238,6 +239,8 @@ export function UvCard() {
           Live reading unavailable ({fallbackReason}), so this is an estimate from the forecast.
         </ThemedText>
       )}
+
+      <SunscreenRow place={place} needsProtection={needsProtection} />
 
       {forecast && (
         <>
