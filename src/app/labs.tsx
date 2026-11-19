@@ -31,6 +31,14 @@ import { parseDate } from '@/lib/meds';
 import { photographReport, pickReportImages } from '@/lib/scan';
 
 const GROUPS = ['Lupus activity', 'Blood counts', 'Kidneys', 'Liver', 'Other'] as const;
+/** Heading shown for each group. Tests without a built-in category go under "Test results". */
+const GROUP_TITLE: Record<(typeof GROUPS)[number], string> = {
+  'Lupus activity': 'Lupus activity',
+  'Blood counts': 'Blood counts',
+  Kidneys: 'Kidneys',
+  Liver: 'Liver',
+  Other: 'Test results',
+};
 
 export default function LabsScreen() {
   const [labs, setLabs] = useState<LabResult[]>([]);
@@ -138,7 +146,7 @@ export default function LabsScreen() {
         return (
           <Card key={g}>
             <ThemedText type="smallBold" themeColor="textSecondary">
-              {g.toUpperCase()}
+              {GROUP_TITLE[g].toUpperCase()}
             </ThemedText>
             {inGroup.map((t) => (
               <TestRow
