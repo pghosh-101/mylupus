@@ -14,6 +14,7 @@ import {
   type CityResult,
   type Place,
 } from '@/lib/location';
+import { scheduleMorningAlerts } from '@/lib/notifications';
 import { Settings } from '@/lib/settings';
 import {
   fetchCurrentUv,
@@ -60,6 +61,8 @@ export function UvCard() {
         fetchUvForecast(place.latitude, place.longitude, threshold),
       ]);
       const forecast = daily.status === 'fulfilled' ? daily.value : null;
+      // Keep the next few morning notifications up to date (at most once an hour).
+      scheduleMorningAlerts(place).catch(() => {});
 
       if (live.status === 'fulfilled') {
         setState({ status: 'ready', now: live.value, forecast, place, fallbackReason: null });

@@ -1,5 +1,6 @@
 import { Card, ComingSoon, Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
+import { MorningAlertCard } from '@/components/morning-alert-card';
 import { UvCard } from '@/components/uv-card';
 
 function greeting() {
@@ -13,10 +14,8 @@ export default function TodayScreen() {
   return (
     <Screen title={greeting()}>
       <UvCard />
-      <ComingSoon
-        phase="Phase 1"
-        items={['Morning UV heads-up notification', 'Sunscreen reapply reminders', '"Heading out" UV check']}
-      />
+      <MorningAlertCard />
+      <ComingSoon phase="Phase 1" items={['Sunscreen reapply reminders', '"Heading out" UV check']} />
       <Card>
         <ThemedText type="small" themeColor="textSecondary">
           MyLupus helps you track patterns to discuss with your care team. It isn&apos;t medical advice.

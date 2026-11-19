@@ -146,3 +146,92 @@ export function formatTime(date: Date): string {
   const m = String(date.getMinutes()).padStart(2, '0');
   return `${h % 12 === 0 ? 12 : h % 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
 }
+
+/** One day's projected UV, used for the morning notification. */
+export type DayProjection = {
+  /** Calendar date at the location, "YYYY-MM-DD". */
+  date: string;
+  /** Projected UV at the morning alert hour. */
+  atAlertHour: number;
+  max: number;
+  peakHour: number;
+  /** First and last hour above the threshold, or null if UV stays within it all day. */
+  window: { start: number; end: number } | null;
+  source: string;
+};
+
+function summarizeDay(
+  date: string,
+  hours: UvHour[],
+  threshold: number,
+  alertHour: number,
+  source: string,
+): DayProjection {
+  let peak = hours[0] ?? { hour: 12, uv: 0 };
+  for (const h of hours) if (h.uv > peak.uv) peak = h;
+  const above = hours.filter((h) => h.uv > threshold);
+  return {
+    date,
+    atAlertHour: hours.find((h) => h.hour === alertHour)?.uv ?? 0,
+    max: peak.uv,
+    peakHour: peak.hour,
+    window: above.length ? { start: above[0].hour, end: above[above.length - 1].hour } : null,
+    source,
+  };
+}
+
+/**
+ * Hourly UV projections for the next 3 days. Uses WeatherAPI.com when a key is set
+ * (same source as the live reading), otherwise Open-Meteo.
+ */
+export async function fetchDailyProjections(
+  latitude: number,
+  longitude: number,
+  threshold: number,
+  alertHour: number,
+): Promise<DayProjection[]> {
+  const q = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
+
+  if (WEATHERAPI_KEY) {
+    try {
+      const res = await fetch(
+        `https://api.weatherapi.com/v1/forecast.json?key=${encodeURIComponent(WEATHERAPI_KEY)}&q=${q}&days=3`,
+      );
+      if (res.ok) {
+        const data: {
+          forecast: { forecastday: { date: string; hour: { time: string; uv?: number }[] }[] };
+        } = await res.json();
+        const days = data.forecast.forecastday;
+        // Only trust it if the hourly UV values are actually there.
+        if (days.length && days[0].hour.some((h) => typeof h.uv === 'number')) {
+          return days.map((d) =>
+            summarizeDay(
+              d.date,
+              d.hour.map((h) => ({ hour: Number(h.time.slice(11, 13)), uv: Math.max(0, h.uv ?? 0) })),
+              threshold,
+              alertHour,
+              'WeatherAPI.com',
+            ),
+          );
+        }
+      }
+    } catch {
+      // Fall through to Open-Meteo.
+    }
+  }
+
+  const res = await fetch(
+    'https://api.open-meteo.com/v1/forecast' +
+      `?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}` +
+      '&hourly=uv_index&timezone=auto&forecast_days=3',
+  );
+  if (!res.ok) throw new Error(`The weather service returned an error (${res.status}).`);
+  const data: OpenMeteoResponse = await res.json();
+  const byDate = new Map<string, UvHour[]>();
+  data.hourly.time.forEach((t, i) => {
+    const date = t.slice(0, 10);
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date)!.push({ hour: Number(t.slice(11, 13)), uv: Math.max(0, data.hourly.uv_index[i] ?? 0) });
+  });
+  return [...byDate].map(([date, hours]) => summarizeDay(date, hours, threshold, alertHour, 'Open-Meteo'));
+}
