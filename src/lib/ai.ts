@@ -23,14 +23,18 @@ export class ClaudeApiError extends Error {
   }
 }
 
-type ContentBlock = { type: string; text?: string };
-type MessageResponse = { content: ContentBlock[]; stop_reason: string | null };
+/** A content block from a response, kept as-is so it can be sent back unchanged. */
+export type ContentBlock = { type: string; text?: string; [key: string]: unknown };
+export type MessageResponse = { content: ContentBlock[]; stop_reason: string | null };
 
 /**
  * POST /v1/messages over plain HTTPS. (The official TypeScript SDK doesn't load in the
  * React Native development runtime, so the app calls the REST API directly.)
  */
-async function createMessage(body: Record<string, unknown>, timeoutMs = 120_000): Promise<MessageResponse> {
+export async function createMessage(
+  body: Record<string, unknown>,
+  { timeoutMs = 120_000, betas = [] }: { timeoutMs?: number; betas?: string[] } = {},
+): Promise<MessageResponse> {
   if (!API_KEY) throw new Error('No Claude API key set. Add EXPO_PUBLIC_ANTHROPIC_API_KEY to .env.local.');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -44,6 +48,7 @@ async function createMessage(body: Record<string, unknown>, timeoutMs = 120_000)
         'anthropic-version': '2026-10-21',
         // Needed only for the web version (browsers enforce CORS); ignored on the phone.
         'anthropic-dangerous-direct-browser-access': 'true',
+        ...(betas.length ? { 'anthropic-beta': betas.join(',') } : {}),
       },
       body: JSON.stringify(body),
       signal: controller.signal,

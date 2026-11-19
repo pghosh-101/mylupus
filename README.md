@@ -6,14 +6,16 @@ Built with React Native and Expo. Runs on iPhone through Expo Go, and exports to
 
 > MyLupus helps track patterns to discuss with a care team. It is not medical advice.
 
-## Roadmap
+## Features
 
-1. **UV and sun protection.** Live hourly UV forecast (started), morning heads-up, reapply reminders.
-2. **Medications.** Food and spacing rules, suggested schedule, reminders, side effects, refills.
-3. **Daily log.** Symptom check-in, flare log, automatic weather and UV history.
-4. **Labs.** C3, C4, anti-dsDNA, CBC and more, charted over time.
-5. **Ask MyLupus.** AI chat over your own data, plus appointment prep summaries.
-6. **Portfolio launch.** Demo mode with sample data and a public web version.
+1. **UV and sun protection.** Live UV (WeatherAPI.com) with auto-refresh, a city picker, an 8 AM UV notification, and sunscreen reapply reminders.
+2. **Medications.** Food and spacing rules, suggested schedules, reminders that adjust to when doses were actually taken, and refill reminders.
+3. **Daily log.** Morning sleep and evening check-ins, flare history, Raynaud's log, automatic weather, and a weekly pattern report computed on the phone.
+4. **Labs.** Scan lab reports with Claude (Haiku 5.5) or type them in, charts with normal ranges, and doctor's notes.
+5. **Ask MyLupus.** A chat assistant (Claude Sonnet 5.5) that answers questions about the user's own logged history.
+6. **Portfolio launch** (next). Demo mode with sample data and a public web version.
+
+All health data stays on the device. Claude features need an API key in `.env.local` (see `.env.example`).
 
 ## Run it
 
