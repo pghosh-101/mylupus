@@ -6,7 +6,7 @@ import { success } from '@/lib/haptics';
 import type { Place } from '@/lib/location';
 import { getNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
 import { Settings } from '@/lib/settings';
-import { fetchDailyProjections, formatTime } from '@/lib/uv';
+import { fetchDailyProjections, formatHour, formatTime } from '@/lib/uv';
 
 export const REAPPLY_MS = 2 * 60 * 60 * 1000;
 
@@ -87,24 +87,34 @@ export async function applySunscreen(place: Place): Promise<{ state: SunscreenSt
   let message: string;
   let notified = false;
 
-  // Is UV still projected above the limit at reminder time?
+  // Is UV projected above the limit at the 2-hour mark? Only then is a reapply reminder useful.
   let projectedUv: number | null = null;
   let stillHigh = true; // If the forecast is unavailable, remind anyway (safer).
+  let risesLater: number | null = null; // Hour UV goes above the limit later that day, if it does.
   try {
     const days = await fetchDailyProjections(place.latitude, place.longitude, limit, 8);
     const day = days.find((d) => d.date === localDate(remindDate));
     if (day) {
+      // Blend the hourly values to the exact minute of the reminder.
       const hour = remindDate.getHours();
-      projectedUv = day.hours.find((h) => h.hour === hour)?.uv ?? null;
-      // Remind if UV is high at that hour, or hasn't peaked yet (it's still on its way up).
-      stillHigh = day.window !== null && hour <= day.window.end;
+      const thisHour = day.hours.find((h) => h.hour === hour)?.uv;
+      const nextHour = day.hours.find((h) => h.hour === hour + 1)?.uv ?? thisHour;
+      if (thisHour !== undefined && nextHour !== undefined) {
+        projectedUv = thisHour + (nextHour - thisHour) * (remindDate.getMinutes() / 60);
+        stillHigh = projectedUv > limit;
+        if (!stillHigh && day.window && day.window.start > hour) risesLater = day.window.start;
+      }
     }
   } catch {
     // Keep stillHigh = true.
   }
 
   if (!stillHigh) {
-    message = `Logged. No reminder needed: UV is projected to be at or below ${limit} by ${formatTime(remindDate)}.`;
+    message =
+      `Logged. No reapply reminder needed: UV is projected to be ${projectedUv !== null ? projectedUv.toFixed(1) : `at or below ${limit}`} at ${formatTime(remindDate)}.` +
+      (risesLater !== null
+        ? ` It goes above ${limit} around ${formatHour(risesLater)}, so put sunscreen on again before heading out then.`
+        : '');
   } else if (Platform.OS === 'web') {
     message = `Logged. Reapply around ${formatTime(remindDate)}.`;
   } else {
