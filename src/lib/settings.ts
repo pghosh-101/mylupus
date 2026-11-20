@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { DEMO } from '@/lib/demo';
+
 /** Personal settings, chosen in the welcome screens and editable in Settings. Stored on the device. */
 export type AppSettings = {
   /** Used in greetings. Empty means no name. */
@@ -20,7 +22,8 @@ const DEFAULTS: AppSettings = {
   uvThreshold: 2,
   morningAlert: { hour: 8, minute: 0 },
   onboarded: false,
-  appearance: 'system',
+  // The public demo shows the black and purple theme unless the visitor picks otherwise.
+  appearance: DEMO ? 'dark' : 'system',
 };
 
 /**
