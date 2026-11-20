@@ -1,9 +1,9 @@
+import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { DEMO } from '@/lib/demo';
 import { CheckinCard } from '@/components/log/checkin-cards';
-import { MorningAlertCard } from '@/components/morning-alert-card';
 import { Card, Screen } from '@/components/screen';
 import { SettingsSheet } from '@/components/settings-sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -11,7 +11,7 @@ import { HeadsUpCard } from '@/components/today/heads-up-card';
 import { NextDoseCard } from '@/components/today/next-dose-card';
 import { UvCard } from '@/components/uv-card';
 import { useTheme } from '@/hooks/use-theme';
-import { Settings, withName } from '@/lib/settings';
+import { withName } from '@/lib/settings';
 
 function greeting() {
   const h = new Date().getHours();
@@ -45,21 +45,14 @@ export default function TodayScreen() {
       <CheckinCard compact />
       <HeadsUpCard />
       <UvCard />
-      <MorningAlertCard />
       <Pressable onPress={() => setSettingsOpen(true)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
         <Card>
           <View style={styles.row}>
-            <View style={styles.flex}>
-              <ThemedText type="smallBold">Settings</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {Settings.name ? `${Settings.name} · ` : ''}UV limit {Settings.uvThreshold} · Morning alert{' '}
-                {new Date(2000, 0, 1, Settings.morningAlert.hour, Settings.morningAlert.minute).toLocaleTimeString(undefined, {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
-              </ThemedText>
-            </View>
-            <ThemedText style={{ color: theme.accent }}>›</ThemedText>
+            <SymbolView name={{ ios: 'gearshape.fill' }} size={18} tintColor={theme.accent} fallback={null} style={styles.icon} />
+            <ThemedText type="smallBold" style={styles.flex}>
+              Settings
+            </ThemedText>
+            <ThemedText style={{ color: theme.textSecondary }}>›</ThemedText>
           </View>
         </Card>
       </Pressable>
@@ -75,6 +68,7 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  flex: { flex: 1, gap: 2 },
+  flex: { flex: 1 },
+  icon: { width: 20, height: 20 },
   demo: { borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12 },
 });
