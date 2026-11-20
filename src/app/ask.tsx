@@ -195,7 +195,7 @@ export default function AskScreen() {
                       style={[
                         styles.bubble,
                         mine
-                          ? [styles.mine, { backgroundColor: theme.accent }]
+                          ? [styles.mine, { backgroundColor: theme.accentFill }]
                           : [styles.theirs, { backgroundColor: theme.backgroundElement }],
                       ]}>
                       <ThemedText selectable style={mine ? { color: theme.onAccent } : undefined}>
@@ -259,7 +259,7 @@ export default function AskScreen() {
             <Pressable
               onPress={() => send(draft)}
               disabled={!draft.trim() || sending}
-              style={[styles.send, { backgroundColor: theme.accent, opacity: !draft.trim() || sending ? 0.4 : 1 }]}>
+              style={[styles.send, { backgroundColor: theme.accentFill, opacity: !draft.trim() || sending ? 0.4 : 1 }]}>
               <ThemedText type="button" style={{ color: theme.onAccent }}>
                 Send
               </ThemedText>

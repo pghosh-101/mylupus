@@ -114,7 +114,7 @@ function Button({
       style={({ pressed }) => [
         styles.button,
         {
-          backgroundColor: primary ? theme.accent : theme.backgroundSelected,
+          backgroundColor: primary ? theme.accentFill : theme.backgroundSelected,
           opacity: disabled ? 0.5 : pressed ? 0.7 : 1,
         },
       ]}>

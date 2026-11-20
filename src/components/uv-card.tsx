@@ -421,7 +421,7 @@ function Button({
         tap();
         onPress();
       }}
-      style={[styles.button, { backgroundColor: secondary ? theme.backgroundSelected : theme.accent }]}>
+      style={[styles.button, { backgroundColor: secondary ? theme.backgroundSelected : theme.accentFill }]}>
       <ThemedText type="button" style={{ color: secondary ? theme.text : theme.onAccent }}>
         {label}
       </ThemedText>

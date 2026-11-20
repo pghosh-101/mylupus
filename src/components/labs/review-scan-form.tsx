@@ -128,7 +128,7 @@ export function ReviewScanForm({
                   <View
                     style={[
                       styles.check,
-                      { borderColor: theme.accent, backgroundColor: r.include ? theme.accent : 'transparent' },
+                      { borderColor: theme.accent, backgroundColor: r.include ? theme.accentFill : 'transparent' },
                     ]}>
                     {r.include && <ThemedText style={[styles.checkMark, { color: theme.onAccent }]}>✓</ThemedText>}
                   </View>

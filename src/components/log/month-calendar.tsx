@@ -10,6 +10,14 @@ import { parseDate, todayString } from '@/lib/meds';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+/** Black or white, whichever reads better on a solid hex color (#RRGGBB). */
+function readableOn(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const l = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return l > 0.18 ? '#000000' : '#FFFFFF';
+}
+
 /** 0 good day, 1 mild, 2 moderate, 3 severe; null if no evening check-in. */
 export function dayLevel(e: EveningEntry | undefined): number | null {
   if (!e) return null;
@@ -98,7 +106,8 @@ export function MonthCalendar({
           const logged = level !== null || Boolean(sleep[date]);
           const future = date > today;
           const fill = level !== null ? LEVEL_COLORS[level] : logged ? theme.backgroundSelected : 'transparent';
-          const darkText = level === 0 || level === 3;
+          // Solid colors (good, severe) pick black or white text; the see-through ones keep normal text.
+          const solid = level === 0 || level === 3 ? LEVEL_COLORS[level] : null;
           return (
             <View key={date} style={styles.cell}>
               <Pressable
@@ -113,7 +122,7 @@ export function MonthCalendar({
                     opacity: future ? 0.3 : pressed ? 0.6 : 1,
                   },
                 ]}>
-                <ThemedText type="small" style={{ color: darkText ? theme.onAccent : theme.text, fontWeight: '600' }}>
+                <ThemedText type="small" style={{ color: solid ? readableOn(solid) : theme.text, fontWeight: '600' }}>
                   {day}
                 </ThemedText>
                 {flareDays.has(date) && <View style={[styles.flareDot, { backgroundColor: theme.sunAlert, borderColor: theme.backgroundElement }]} />}

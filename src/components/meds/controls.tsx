@@ -126,8 +126,8 @@ export function Segmented<T extends string | number>({
             style={[
               styles.seg,
               {
-                backgroundColor: selected ? theme.accent : theme.background,
-                borderColor: selected ? theme.accent : theme.backgroundSelected,
+                backgroundColor: selected ? theme.accentFill : theme.background,
+                borderColor: selected ? theme.accentFill : theme.backgroundSelected,
               },
             ]}>
             <ThemedText type="smallBold" style={{ color: selected ? theme.onAccent : theme.text }}>
@@ -152,7 +152,7 @@ export function ActionButton({
   disabled?: boolean;
 }) {
   const theme = useTheme();
-  const bg = kind === 'primary' ? theme.accent : theme.backgroundSelected;
+  const bg = kind === 'primary' ? theme.accentFill : theme.backgroundSelected;
   const fg = kind === 'primary' ? theme.onAccent : kind === 'danger' ? theme.sunAlert : theme.accent;
   return (
     <Pressable
@@ -227,8 +227,8 @@ export function MultiChips({
             style={[
               chipStyles.chip,
               {
-                backgroundColor: on ? theme.accent : theme.background,
-                borderColor: on ? theme.accent : theme.backgroundSelected,
+                backgroundColor: on ? theme.accentFill : theme.background,
+                borderColor: on ? theme.accentFill : theme.backgroundSelected,
               },
             ]}>
             <ThemedText type="small" style={{ color: on ? theme.onAccent : theme.text, fontWeight: '600' }}>

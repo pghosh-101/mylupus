@@ -100,7 +100,7 @@ function SmallButton({ label, onPress, primary }: { label: string; onPress: () =
       }}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: primary ? theme.accent : theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
+        { backgroundColor: primary ? theme.accentFill : theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
       ]}>
       <ThemedText type="button" style={{ color: primary ? theme.onAccent : theme.accent }}>
         {label}
