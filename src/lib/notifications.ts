@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import type { Place } from '@/lib/location';
-import { Settings } from '@/lib/settings';
+import { Settings, withName } from '@/lib/settings';
 import { fetchDailyProjections, formatHour, type DayProjection } from '@/lib/uv';
 
 const MORNING_PREFIX = 'morning-uv-';
@@ -43,7 +43,7 @@ export function morningMessage(day: DayProjection): { title: string; body: strin
       ? `above ${limit} from ${formatHour(day.window.start)}–${formatHour(day.window.end)}`
       : `within your limit all day`,
   );
-  return { title: `Good morning, ${Settings.name}`, body: `${parts.join(' · ')}\nTap to log your sleep.` };
+  return { title: `Good morning${withName()}`, body: `${parts.join(' · ')}\nTap to log your sleep.` };
 }
 
 /** Local Date for the alert time on a "YYYY-MM-DD" date, in the phone's time zone. */

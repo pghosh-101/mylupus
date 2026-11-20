@@ -155,7 +155,7 @@ export default function AskScreen() {
               <>
                 <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText>
-                    Hi {Settings.name}. Ask me anything about your logged history: symptoms, sleep, meals, flares,
+                    Hi{Settings.name ? ` ${Settings.name}` : ''}. Ask me anything about your logged history: symptoms, sleep, meals, flares,
                     medications, labs, and UV.
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">

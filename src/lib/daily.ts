@@ -201,7 +201,7 @@ export async function scheduleEveningReminder() {
   await Notifications.scheduleNotificationAsync({
     identifier: EVENING_ID,
     content: {
-      title: `How was today, ${Settings.name}?`,
+      title: Settings.name ? `How was today, ${Settings.name}?` : 'How was today?',
       body: 'Log symptoms, stress, and meals. Takes about 30 seconds.',
     },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, ...EVENING_TIME },

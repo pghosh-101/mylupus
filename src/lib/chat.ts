@@ -54,6 +54,11 @@ export type Conversation = {
   context: string;
   messages: ChatMessage[];
   /**
+   * The exact system prompt this chat started with. Re-sent unchanged on every turn, so app
+   * updates that change the prompt never edit an ongoing chat's history.
+   */
+  systemPrompt?: string;
+  /**
    * Whether this chat can search the web. Fixed when the chat starts, because changing the
    * tools mid-conversation would edit its history.
    */
@@ -144,7 +149,7 @@ export async function buildContext(): Promise<string> {
   const section = (title: string) => out.push('', `## ${title}`);
 
   out.push(`Snapshot taken ${fmtTime(Date.now())} (today is ${todayString()}).`);
-  out.push(`Name: ${Settings.name}. Condition: lupus (SLE). UV limit: protects from sun when UV is above ${Settings.uvThreshold}.`);
+  out.push(`Name: ${Settings.name || 'not given'}. Condition: lupus (SLE). UV limit: protects from sun when UV is above ${Settings.uvThreshold}.`);
 
   section('Medical history (entered by the user)');
   out.push(`Diagnosed: ${history.diagnosed || 'not entered'}`);
@@ -285,7 +290,7 @@ export async function buildContext(): Promise<string> {
 // Asking
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are the assistant inside MyLupus, a personal app that ${Settings.name} built to track their own lupus: symptoms, sleep, stress, meals, flares, medications, labs, UV and weather. You answer their questions using the data snapshot below.
+const SYSTEM_PROMPT = `You are the assistant inside MyLupus, a personal app someone uses to track their own lupus: symptoms, sleep, stress, meals, flares, medications, labs, UV and weather. You answer their questions using the data snapshot below.
 
 How to answer:
 - Ground answers in their data. Mention the specific dates, numbers, and entries you're relying on, briefly.
@@ -308,12 +313,15 @@ Boundaries:
  * and earlier turns are sent back exactly as they were.
  */
 export async function ask(question: string, existing: Conversation | null): Promise<Conversation> {
-  const convo: Conversation = existing ?? {
+  // Chats saved by older versions of the app didn't store their prompt, so they can't be continued
+  // safely; the next question starts a fresh chat instead.
+  const convo: Conversation = (existing?.systemPrompt ? existing : null) ?? {
     id: `${Date.now()}`,
     startedAt: Date.now(),
     context: await buildContext(),
     messages: [],
     webSearch: true,
+    systemPrompt: SYSTEM_PROMPT,
   };
   const withQuestion: Conversation = {
     ...convo,
@@ -332,9 +340,13 @@ export async function ask(question: string, existing: Conversation | null): Prom
         fallbacks: 'default',
         ...(convo.webSearch ? { tools: [WEB_SEARCH_TOOL] } : {}),
         system: [
-          { type: 'text', text: SYSTEM_PROMPT },
+          { type: 'text', text: convo.systemPrompt ?? SYSTEM_PROMPT },
           // The snapshot is the same for every turn of this chat, so cache it.
-          { type: 'text', text: `# ${Settings.name}'s data\n${convo.context}`, cache_control: { type: 'ephemeral' } },
+          {
+            type: 'text',
+            text: `# Their data\n${convo.context}`,
+            cache_control: { type: 'ephemeral' },
+          },
         ],
         messages,
       },
