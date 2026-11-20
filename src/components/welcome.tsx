@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DEMO } from '@/lib/demo';
 import { ActionButton, Input, Segmented, TimeStepper } from '@/components/meds/controls';
 import { ThemedText } from '@/components/themed-text';
 import { HeadingFont, Spacing } from '@/constants/theme';
@@ -83,6 +84,15 @@ export function Welcome({ onDone }: { onDone: () => void }) {
                   A calm place to keep track of your lupus: UV alerts, medication reminders, symptoms, flares, and
                   labs, with an assistant that can look for patterns in your own history.
                 </ThemedText>
+                {DEMO && (
+                  <View style={[styles.note, { backgroundColor: theme.backgroundSelected }]}>
+                    <ThemedText type="smallBold">This is a demo.</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      It&apos;s filled with two months of sample data for a fictional user, Alex. AI answers are
+                      pre-written examples, and nothing you enter leaves this browser.
+                    </ThemedText>
+                  </View>
+                )}
                 <View style={[styles.note, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText type="smallBold">Your data stays on your phone.</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">

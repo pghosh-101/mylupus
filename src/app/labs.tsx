@@ -2,6 +2,8 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { demoScan } from '@/lib/demo-content';
+import { DEMO } from '@/lib/demo';
 import { CardHeader } from '@/components/card-header';
 import { AddResultsForm } from '@/components/labs/add-results-form';
 import { ReviewScanForm } from '@/components/labs/review-scan-form';
@@ -83,6 +85,15 @@ export default function LabsScreen() {
   };
 
   const startScan = () => {
+    if (DEMO) {
+      // The demo shows a sample report instead of reading a photo.
+      setScanning(true);
+      setTimeout(() => {
+        setScanning(false);
+        setScan(demoScan());
+      }, 1500);
+      return;
+    }
     if (!hasAiKey) {
       Alert.alert(
         'Claude API key needed',

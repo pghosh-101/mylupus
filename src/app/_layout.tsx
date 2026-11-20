@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { AppState, useColorScheme } from 'react-native';
 
+import { seedDemoData } from '@/lib/demo';
 import { LaunchOverlay } from '@/components/launch-overlay';
 import AppTabs from '@/components/app-tabs';
 import { Welcome } from '@/components/welcome';
@@ -28,10 +29,12 @@ export default function TabLayout() {
   const [showLaunch, setShowLaunch] = useState(true);
 
   useEffect(() => {
-    loadSettings().then((s) => {
-      setOnboarded(s.onboarded);
-      setSettingsReady(true);
-    });
+    seedDemoData()
+      .then(loadSettings)
+      .then((s) => {
+        setOnboarded(s.onboarded);
+        setSettingsReady(true);
+      });
     return onSettingsChange((s) => {
       setOnboarded(s.onboarded);
       setAppKey((k) => k + 1);

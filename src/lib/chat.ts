@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { demoAnswer } from '@/lib/demo-content';
+import { DEMO } from '@/lib/demo';
 import { createMessage, type ContentBlock } from '@/lib/ai';
 import {
   lastDates,
@@ -352,6 +354,15 @@ export async function ask(question: string, existing: Conversation | null): Prom
       },
       { betas: ['server-side-fallback-2026-07-01'], timeoutMs: 180_000 },
     );
+
+  if (DEMO) {
+    // Pre-written example answers; the demo never calls the API.
+    await new Promise((r) => setTimeout(r, 1200));
+    const reply: ChatMessage = { role: 'assistant', content: demoAnswer(question), at: Date.now() };
+    const updated: Conversation = { ...withQuestion, messages: [...withQuestion.messages, reply] };
+    await saveConversation(updated);
+    return updated;
+  }
 
   const history = withQuestion.messages.map((m) => ({ role: m.role, content: m.content as unknown }));
   let response = await request(history);

@@ -1,10 +1,12 @@
+import { DEMO } from '@/lib/demo';
 import { LAB_TESTS } from '@/lib/labs';
 
 /**
  * Claude API key, read from the local .env.local file (never committed to GitHub).
  * It is bundled into the app on your phone, so keep a spending limit on the key.
  */
-const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
+// The public demo never uses a key (and is built without .env files).
+const API_KEY = DEMO ? undefined : process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
 export const hasAiKey = Boolean(API_KEY);
 
 /**

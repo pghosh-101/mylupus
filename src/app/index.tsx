@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { DEMO } from '@/lib/demo';
 import { CheckinCard } from '@/components/log/checkin-cards';
 import { MorningAlertCard } from '@/components/morning-alert-card';
 import { Card, Screen } from '@/components/screen';
@@ -32,6 +33,14 @@ export default function TodayScreen() {
 
   return (
     <Screen title={title} subtitle={date}>
+      {DEMO && (
+        <View style={[styles.demo, { backgroundColor: theme.backgroundSelected }]}>
+          <ThemedText type="small">
+            <ThemedText type="smallBold">Demo · sample data</ThemedText> for a fictional user. Nothing you enter
+            leaves this browser.
+          </ThemedText>
+        </View>
+      )}
       <NextDoseCard />
       <CheckinCard compact />
       <HeadsUpCard />
@@ -67,4 +76,5 @@ export default function TodayScreen() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   flex: { flex: 1, gap: 2 },
+  demo: { borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12 },
 });

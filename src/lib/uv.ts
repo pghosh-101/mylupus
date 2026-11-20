@@ -3,6 +3,8 @@
  * https://open-meteo.com/en/docs
  */
 
+import { DEMO } from '@/lib/demo';
+
 export type UvHour = { hour: number; uv: number };
 
 export type UvForecast = {
@@ -105,7 +107,8 @@ export type CurrentUv = {
  * WeatherAPI.com key, read from the local .env.local file (never committed to GitHub).
  * Without it, the app falls back to Open-Meteo's forecast.
  */
-const WEATHERAPI_KEY = process.env.EXPO_PUBLIC_WEATHERAPI_KEY;
+// The public demo never uses a key; it falls back to Open-Meteo, which needs none.
+const WEATHERAPI_KEY = DEMO ? undefined : process.env.EXPO_PUBLIC_WEATHERAPI_KEY;
 export const hasWeatherApiKey = Boolean(WEATHERAPI_KEY);
 
 /** Current conditions from WeatherAPI.com (refreshed by them roughly every 15 minutes). */

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DEMO } from '@/lib/demo';
 import { CardHeader } from '@/components/card-header';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -143,7 +144,7 @@ export default function AskScreen() {
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           <View style={styles.inner}>
-            {!hasAiKey ? (
+            {!hasAiKey && !DEMO ? (
               <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
                 <ThemedText type="smallBold">Claude API key needed</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
@@ -164,6 +165,12 @@ export default function AskScreen() {
                     (about 1–3¢, a few cents more when I search the web).
                   </ThemedText>
                 </View>
+                {DEMO && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Demo: answers are pre-written examples based on the sample data. In the full app, Claude answers
+                    from your own history.
+                  </ThemedText>
+                )}
                 <CardHeader icon="bubble.left.and.bubble.right.fill" title="TRY ASKING" />
                 {STARTERS.map((q) => (
                   <Pressable
@@ -231,7 +238,7 @@ export default function AskScreen() {
           </View>
         </ScrollView>
 
-        {hasAiKey && (
+        {(hasAiKey || DEMO) && (
           <View
             style={[
               styles.inputBar,
