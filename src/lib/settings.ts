@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /** Personal settings, chosen in the welcome screens and editable in Settings. Stored on the device. */
@@ -10,6 +11,8 @@ export type AppSettings = {
   morningAlert: { hour: number; minute: number };
   /** Whether the welcome screens have been completed. */
   onboarded: boolean;
+  /** Light or dark appearance, or follow the device setting. */
+  appearance: 'system' | 'light' | 'dark';
 };
 
 const DEFAULTS: AppSettings = {
@@ -17,6 +20,7 @@ const DEFAULTS: AppSettings = {
   uvThreshold: 2,
   morningAlert: { hour: 8, minute: 0 },
   onboarded: false,
+  appearance: 'system',
 };
 
 /**
@@ -62,4 +66,13 @@ const listeners = new Set<(s: AppSettings) => void>();
 export function onSettingsChange(fn: (s: AppSettings) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
+}
+
+/** The current appearance setting, as a React hook that updates when settings change. */
+export function useAppearanceSetting(): AppSettings['appearance'] {
+  return useSyncExternalStore(
+    (onChange) => onSettingsChange(() => onChange()),
+    () => Settings.appearance,
+    () => Settings.appearance,
+  );
 }

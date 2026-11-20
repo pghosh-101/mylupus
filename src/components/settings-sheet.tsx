@@ -5,19 +5,21 @@ import { ActionButton, Field, FormSheet, Input, Segmented, TimeStepper } from '@
 import { ThemedText } from '@/components/themed-text';
 import { loadSavedPlace } from '@/lib/location';
 import { scheduleMorningAlerts } from '@/lib/notifications';
-import { saveSettings, Settings } from '@/lib/settings';
+import { saveSettings, Settings, type AppSettings } from '@/lib/settings';
 
 /** Edit name, UV limit, and morning alert time; or replay the welcome screens. */
 export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [name, setName] = useState('');
   const [uv, setUv] = useState(2);
   const [alertAt, setAlertAt] = useState(8 * 60);
+  const [appearance, setAppearance] = useState<AppSettings['appearance']>('system');
 
   useEffect(() => {
     if (!visible) return;
     setName(Settings.name);
     setUv(Settings.uvThreshold);
     setAlertAt(Settings.morningAlert.hour * 60 + Settings.morningAlert.minute);
+    setAppearance(Settings.appearance);
   }, [visible]);
 
   const save = async () => {
@@ -28,6 +30,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       name: name.trim(),
       uvThreshold: uv,
       morningAlert: { hour: Math.floor(alertAt / 60), minute: alertAt % 60 },
+      appearance,
     });
     if (alertChanged && Platform.OS !== 'web') {
       const place = await loadSavedPlace();
@@ -45,6 +48,17 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       </Field>
       <Field label="Morning UV alert">
         <TimeStepper value={alertAt} onChange={setAlertAt} />
+      </Field>
+      <Field label="Appearance" hint="System follows your device's light or dark setting.">
+        <Segmented
+          options={[
+            { value: 'system', label: 'System' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+          value={appearance}
+          onChange={setAppearance}
+        />
       </Field>
       <Field label="Welcome screens">
         <ThemedText type="small" themeColor="textSecondary">

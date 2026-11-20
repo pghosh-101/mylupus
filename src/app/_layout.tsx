@@ -6,10 +6,12 @@ import {
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { AppState, useColorScheme } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { AppState } from 'react-native';
 
 import { seedDemoData } from '@/lib/demo';
 import { LaunchOverlay } from '@/components/launch-overlay';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import AppTabs from '@/components/app-tabs';
 import { Welcome } from '@/components/welcome';
 import { scheduleEveningReminder } from '@/lib/daily';
@@ -62,6 +64,7 @@ export default function TabLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       <AppTabs key={appKey} />
       {onboarded ? (
         showLaunch && <LaunchOverlay />

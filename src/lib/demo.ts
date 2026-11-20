@@ -147,7 +147,7 @@ export async function seedDemoData() {
   });
 
   const entries: [string, unknown][] = [
-    ['mylupus.settings', { name: 'Alex', uvThreshold: 2, morningAlert: { hour: 8, minute: 0 }, onboarded: false }],
+    ['mylupus.settings', { name: 'Alex', uvThreshold: 2, morningAlert: { hour: 8, minute: 0 }, onboarded: false, appearance: 'dark' }],
     ['mylupus.place', { latitude: 35.2828, longitude: -120.6596, name: 'San Luis Obispo', source: 'city' }],
     [
       'mylupus.meds',

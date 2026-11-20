@@ -1,21 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
+import { useColorScheme as useDeviceColorScheme } from 'react-native';
+
+import { useAppearanceSetting } from '@/lib/settings';
 
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * 'light' or 'dark': the Appearance setting if chosen, otherwise the browser setting.
+ * The browser setting is only read after hydration, to support static rendering.
  */
-export function useColorScheme() {
+export function useColorScheme(): 'light' | 'dark' {
   const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
-  return 'light';
+  useEffect(() => setHasHydrated(true), []);
+  const device = useDeviceColorScheme();
+  const setting = useAppearanceSetting();
+  if (setting !== 'system') return setting;
+  return hasHydrated && device === 'dark' ? 'dark' : 'light';
 }
