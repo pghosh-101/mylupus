@@ -49,6 +49,15 @@
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
+    },
+    "owner": "pghosh-101",
+    "extra": {
+      "eas": {
+        "projectId": "d6bb1a7e-c0e8-4176-a38b-86e0e44903bf"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d6bb1a7e-c0e8-4176-a38b-86e0e44903bf"
     }
   }
 }
