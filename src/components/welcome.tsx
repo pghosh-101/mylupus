@@ -51,21 +51,27 @@ export function Welcome({ onDone }: { onDone: () => void }) {
       <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.top}>
-            {step > 0 ? (
-              <Pressable onPress={back} hitSlop={12}>
-                <ThemedText style={{ color: theme.accent }}>‹ Back</ThemedText>
-              </Pressable>
-            ) : (
-              <View />
-            )}
-            <View style={styles.dots}>
+            <View style={styles.side}>
+              {step > 0 && (
+                <Pressable onPress={back} hitSlop={12}>
+                  <ThemedText style={{ color: theme.accent }}>‹ Back</ThemedText>
+                </Pressable>
+              )}
+            </View>
+            <View style={styles.dots} accessible accessibilityLabel={`Step ${step + 1} of ${STEPS}`}>
               {Array.from({ length: STEPS }, (_, i) => (
                 <View
                   key={i}
-                  style={[styles.dot, { backgroundColor: i === step ? theme.accent : theme.backgroundSelected }]}
+                  style={[
+                    styles.dot,
+                    i === step
+                      ? [styles.dotActive, { backgroundColor: theme.accent }]
+                      : { backgroundColor: theme.textSecondary, opacity: 0.45 },
+                  ]}
                 />
               ))}
             </View>
+            <View style={styles.side} />
           </View>
 
           <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -233,8 +239,10 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     minHeight: 44,
   },
-  dots: { flexDirection: 'row', gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  side: { width: 70 },
+  dots: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dot: { width: 9, height: 9, borderRadius: 5 },
+  dotActive: { width: 24 },
   body: { padding: Spacing.four, gap: Spacing.three, flexGrow: 1, justifyContent: 'center', maxWidth: 520, alignSelf: 'center', width: '100%' },
   logo: { width: 120, height: 120, alignSelf: 'center' },
   h1: { fontFamily: HeadingFont.bold, fontSize: 28, lineHeight: 36 },
