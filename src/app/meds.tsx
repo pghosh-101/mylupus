@@ -156,7 +156,7 @@ function TodaysDoses({
   const today = todayString();
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const items = planTimeline(meds, log, today, routine, routineLog);
+  const items = planTimeline(meds, log, today, routine, routineLog, now.getTime());
   const doses = items.filter((i) => i.kind === 'dose');
   const done = doses.filter((d) => d.entry).length;
 

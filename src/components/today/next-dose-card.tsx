@@ -75,7 +75,7 @@ export function NextDoseCard() {
 
   const reload = useCallback(async () => {
     const [meds, log, routine, routineLog] = await Promise.all([loadMeds(), loadDoseLog(), loadRoutine(), loadRoutineLog()]);
-    setDoses(meds.length ? planDay(meds, log, todayString(), routine, routineLog) : []);
+    setDoses(meds.length ? planDay(meds, log, todayString(), routine, routineLog, Date.now()) : []);
     setNow(new Date());
   }, []);
 

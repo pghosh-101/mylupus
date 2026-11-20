@@ -10,9 +10,8 @@ import { ActionButton, Input, Segmented, TimeStepper } from '@/components/meds/c
 import { ThemedText } from '@/components/themed-text';
 import { HeadingFont, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { scheduleEveningReminder } from '@/lib/daily';
-import { rescheduleMedNotifications } from '@/lib/meds';
 import { requestNotificationPermission } from '@/lib/notifications';
+import { applyReminderSettings } from '@/lib/reminders';
 import { saveSettings, Settings } from '@/lib/settings';
 
 const STEPS = 5;
@@ -37,9 +36,8 @@ export function Welcome({ onDone }: { onDone: () => void }) {
       morningAlert: { hour: Math.floor(alertAt / 60), minute: alertAt % 60 },
       onboarded: true,
     });
-    // Permissions may have just been granted: set up reminders now.
-    scheduleEveningReminder().catch(() => {});
-    rescheduleMedNotifications().catch(() => {});
+    // Permissions may have just been granted, and the name is in the reminders: set them up now.
+    applyReminderSettings().catch(() => {});
     onDone();
   };
 

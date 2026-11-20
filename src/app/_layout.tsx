@@ -14,8 +14,8 @@ import { LaunchOverlay } from '@/components/launch-overlay';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import AppTabs from '@/components/app-tabs';
 import { Welcome } from '@/components/welcome';
-import { scheduleEveningReminder } from '@/lib/daily';
 import { listenForDoseActions, rescheduleMedNotifications, setupDoseCategory } from '@/lib/meds';
+import { applyReminderSettings } from '@/lib/reminders';
 import { loadSettings, onSettingsChange } from '@/lib/settings';
 
 SplashScreen.preventAutoHideAsync();
@@ -44,11 +44,12 @@ export default function TabLayout() {
   }, []);
 
   // Taken / Snooze / Skip buttons on medication reminders.
-  // Medication reminders are scheduled two weeks ahead; refresh them whenever the app opens.
+  // Reminders follow what's been logged; refresh them once settings load and whenever the app opens.
+  useEffect(() => {
+    if (settingsReady) applyReminderSettings().catch(() => {});
+  }, [settingsReady]);
   useEffect(() => {
     setupDoseCategory();
-    rescheduleMedNotifications().catch(() => {});
-    scheduleEveningReminder().catch(() => {});
     const stopListening = listenForDoseActions();
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') rescheduleMedNotifications().catch(() => {});

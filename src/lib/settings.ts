@@ -15,6 +15,16 @@ export type AppSettings = {
   onboarded: boolean;
   /** Light or dark appearance, or follow the device setting. */
   appearance: 'system' | 'light' | 'dark';
+  /** Which kinds of reminders to send. Each can be turned off in Settings. */
+  notify: {
+    /** Medication reminders, repeats for missed doses, and refill reminders. */
+    meds: boolean;
+    morningUv: boolean;
+    sunscreen: boolean;
+    evening: boolean;
+  };
+  /** Use the phone's location for UV. When off, UV is shown for a city you pick. */
+  useLocation: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -24,6 +34,8 @@ const DEFAULTS: AppSettings = {
   onboarded: false,
   // The public demo shows the black and purple theme unless the visitor picks otherwise.
   appearance: DEMO ? 'dark' : 'system',
+  notify: { meds: true, morningUv: true, sunscreen: true, evening: true },
+  useLocation: true,
 };
 
 /**
@@ -37,7 +49,9 @@ const KEY = 'mylupus.settings';
 export async function loadSettings(): Promise<AppSettings> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    Object.assign(Settings, DEFAULTS, raw ? JSON.parse(raw) : {});
+    const saved: Partial<AppSettings> = raw ? JSON.parse(raw) : {};
+    // Merge nested reminder switches so settings saved before a switch existed keep its default.
+    Object.assign(Settings, DEFAULTS, saved, { notify: { ...DEFAULTS.notify, ...saved.notify } });
   } catch {
     Object.assign(Settings, DEFAULTS);
   }

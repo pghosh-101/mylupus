@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import { success } from '@/lib/haptics';
 import type { Place } from '@/lib/location';
 import { loadDoseLog, loadMeds, todayString } from '@/lib/meds';
-import { getNotificationPermission } from '@/lib/notifications';
+import { getNotificationPermission, remindersOn } from '@/lib/notifications';
 import { Settings } from '@/lib/settings';
 import { loadSunscreenLog } from '@/lib/sunscreen';
 import { fetchTodayWeather, type DayWeather } from '@/lib/uv';
@@ -196,8 +196,9 @@ export const EVENING_TIME = { hour: 21, minute: 0 };
 /** Daily 9 PM "How was today?" reminder. */
 export async function scheduleEveningReminder() {
   if (Platform.OS === 'web') return;
-  if ((await getNotificationPermission()) !== 'granted') return;
   await Notifications.cancelScheduledNotificationAsync(EVENING_ID).catch(() => {});
+  if (!remindersOn('evening')) return;
+  if ((await getNotificationPermission()) !== 'granted') return;
   await Notifications.scheduleNotificationAsync({
     identifier: EVENING_ID,
     content: {

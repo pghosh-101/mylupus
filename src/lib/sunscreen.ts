@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 
 import { success } from '@/lib/haptics';
 import type { Place } from '@/lib/location';
-import { getNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
+import { getNotificationPermission, remindersOn, requestNotificationPermission } from '@/lib/notifications';
 import { Settings } from '@/lib/settings';
 import { fetchDailyProjections, formatHour, formatTime } from '@/lib/uv';
 
@@ -64,7 +64,7 @@ export async function loadSunscreenLog(): Promise<SunscreenEvent[]> {
   }
 }
 
-async function cancelReminder() {
+export async function cancelReminder() {
   if (Platform.OS === 'web') return;
   await Notifications.cancelScheduledNotificationAsync(REMINDER_ID).catch(() => {});
 }
@@ -117,6 +117,8 @@ export async function applySunscreen(place: Place): Promise<{ state: SunscreenSt
         : '');
   } else if (Platform.OS === 'web') {
     message = `Logged. Reapply around ${formatTime(remindDate)}.`;
+  } else if (!remindersOn('sunscreen')) {
+    message = `Logged. Reapply around ${formatTime(remindDate)}. (Sunscreen reminders are off in Settings.)`;
   } else {
     let permission = await getNotificationPermission();
     if (permission === 'undetermined') permission = await requestNotificationPermission();

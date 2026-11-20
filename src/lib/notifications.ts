@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import type { Place } from '@/lib/location';
-import { Settings, withName } from '@/lib/settings';
+import { Settings, withName, type AppSettings } from '@/lib/settings';
 import { fetchDailyProjections, formatHour, type DayProjection } from '@/lib/uv';
 
 const MORNING_PREFIX = 'morning-uv-';
@@ -17,6 +17,30 @@ if (Platform.OS !== 'web') {
       shouldSetBadge: false,
     }),
   });
+}
+
+/**
+ * A copy of the app loaded from the dev server (`npx expo start`) doesn't schedule reminders.
+ * Expo Go keeps it separate from the EAS Update copy, with its own storage and its own scheduled
+ * notifications, so if both scheduled reminders the phone would get everything twice.
+ * Set EXPO_PUBLIC_DEV_NOTIFICATIONS=1 to test reminders from the dev server.
+ */
+export const DEV_COPY = __DEV__ && process.env.EXPO_PUBLIC_DEV_NOTIFICATIONS !== '1';
+
+export type ReminderKind = keyof AppSettings['notify'];
+
+/** Whether reminders of this kind should be scheduled (the Settings switch, and not a dev copy). */
+export const remindersOn = (kind: ReminderKind) => Platform.OS !== 'web' && !DEV_COPY && Settings.notify[kind];
+
+/** Cancel every scheduled notification whose identifier starts with one of `prefixes`. */
+export async function cancelByPrefix(...prefixes: string[]) {
+  if (Platform.OS === 'web') return;
+  const existing = await Notifications.getAllScheduledNotificationsAsync();
+  await Promise.all(
+    existing
+      .filter((n) => prefixes.some((p) => n.identifier.startsWith(p)))
+      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+  );
 }
 
 export type PermissionState = 'granted' | 'denied' | 'undetermined';
@@ -61,6 +85,10 @@ let lastScheduled = 0;
  */
 export async function scheduleMorningAlerts(place: Place, force = false): Promise<number> {
   if (Platform.OS === 'web') return 0;
+  if (!remindersOn('morningUv')) {
+    await cancelByPrefix(MORNING_PREFIX);
+    return 0;
+  }
   if (!force && Date.now() - lastScheduled < 60 * 60 * 1000) return 0;
   if ((await getNotificationPermission()) !== 'granted') return 0;
 
@@ -71,12 +99,7 @@ export async function scheduleMorningAlerts(place: Place, force = false): Promis
     Settings.morningAlert.hour,
   );
 
-  const existing = await Notifications.getAllScheduledNotificationsAsync();
-  await Promise.all(
-    existing
-      .filter((n) => n.identifier.startsWith(MORNING_PREFIX))
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
-  );
+  await cancelByPrefix(MORNING_PREFIX);
 
   let count = 0;
   for (const day of days) {

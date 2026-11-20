@@ -118,7 +118,7 @@ export function UvCard() {
         await showUvFor(saved);
 
         // Then quietly check whether the phone has moved somewhere else.
-        if (saved.source === 'device') {
+        if (saved.source === 'device' && Settings.useLocation) {
           getDevicePlace(false)
             .then(async (here) => {
               if (distanceKm(saved, here) > 10 || (!saved.name && here.name)) {
@@ -132,6 +132,10 @@ export function UvCard() {
       }
 
       // First launch: we need a location before we can show anything.
+      if (!Settings.useLocation) {
+        setState({ status: 'error', message: 'Location is off in Settings. Pick a city to see UV.' });
+        return;
+      }
       setState({ status: 'loading', step: 'Finding your location…' });
       const here = await getDevicePlace(true);
       await savePlace(here);
@@ -165,7 +169,7 @@ export function UvCard() {
     return (
       <CityPicker
         onPick={(city) => choosePlace(city)}
-        onUseDevice={() => choosePlace('device')}
+        onUseDevice={Settings.useLocation ? () => choosePlace('device') : undefined}
         onCancel={() => setPicking(false)}
       />
     );
@@ -321,7 +325,8 @@ function CityPicker({
   onCancel,
 }: {
   onPick: (city: CityResult) => void;
-  onUseDevice: () => void;
+  /** Hidden when location is turned off in Settings. */
+  onUseDevice?: () => void;
   onCancel: () => void;
 }) {
   const theme = useTheme();
@@ -354,9 +359,11 @@ function CityPicker({
         </Pressable>
       </View>
 
-      <Pressable onPress={onUseDevice} style={[styles.option, { backgroundColor: theme.backgroundSelected }]}>
-        <ThemedText type="smallBold">Use my current location</ThemedText>
-      </Pressable>
+      {onUseDevice && (
+        <Pressable onPress={onUseDevice} style={[styles.option, { backgroundColor: theme.backgroundSelected }]}>
+          <ThemedText type="smallBold">Use my current location</ThemedText>
+        </Pressable>
+      )}
 
       <TextInput
         value={query}
