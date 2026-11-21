@@ -76,7 +76,9 @@ export default function LearnScreen() {
   const body = () => {
     if (section === 'ask') return <AskView />;
     if (!prefs) return <ActivityIndicator style={styles.spinner} />;
-    if (!prefs.setUp) return <LearnSetup initial={prefs} personal={personal} onDone={updatePrefs} />;
+    const done = section === 'news' ? prefs.newsSetUp : prefs.librarySetUp;
+    if (!done)
+      return <LearnSetup key={section} section={section} initial={prefs} personal={personal} onDone={updatePrefs} />;
     const common = {
       prefs,
       personal,
@@ -124,7 +126,13 @@ export default function LearnScreen() {
       </View>
       <View style={styles.flex}>{body()}</View>
       {prefs && (
-        <PreferencesSheet visible={editing} prefs={prefs} onClose={() => setEditing(false)} onSave={updatePrefs} />
+        <PreferencesSheet
+          section={section === 'library' ? 'library' : 'news'}
+          visible={editing}
+          prefs={prefs}
+          onClose={() => setEditing(false)}
+          onSave={updatePrefs}
+        />
       )}
     </SafeAreaView>
   );

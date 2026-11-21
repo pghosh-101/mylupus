@@ -6,66 +6,120 @@ import { ActionButton, Field, FormSheet, Segmented } from '@/components/meds/con
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { TOPICS, type FeedKind, type LearnPrefs, type Personal, type TopicId } from '@/lib/learn';
+import {
+  LIBRARY_TOPICS,
+  NEWS_TOPICS,
+  type FeedKind,
+  type LearnPrefs,
+  type LearnSection,
+  type Personal,
+  type TopicId,
+} from '@/lib/learn';
 
-/** The preference fields, shared by first-time setup and the Preferences sheet. */
-function PrefsFields({ prefs, onChange }: { prefs: LearnPrefs; onChange: (p: LearnPrefs) => void }) {
+const setUpKey = (section: LearnSection) => (section === 'news' ? 'newsSetUp' : 'librarySetUp');
+
+/**
+ * The preference fields for one section. Topics are shared (changing them here changes them for
+ * both sections); the rest only affect the section they're shown in.
+ */
+function PrefsFields({
+  section,
+  prefs,
+  onChange,
+}: {
+  section: LearnSection;
+  prefs: LearnPrefs;
+  onChange: (p: LearnPrefs) => void;
+}) {
+  // Only topics that do something in this section: News has no "Lab tests" feed, the Library no "New treatments".
+  const shown = section === 'news' ? NEWS_TOPICS : LIBRARY_TOPICS;
+  const shownIds = shown.map((t) => t.id);
   return (
     <>
-      <Field label="Topics you care about" hint="These shape News and Library. You can still browse everything.">
-        <ToggleChips<TopicId>
-          options={TOPICS.map((t) => ({ value: t.id, label: t.label }))}
-          value={prefs.topics}
-          onChange={(topics) => onChange({ ...prefs, topics })}
-        />
-      </Field>
-      <Field label="In your news feed">
-        <ToggleChips<FeedKind>
-          options={[
-            { value: 'studies', label: 'New studies' },
-            { value: 'news', label: 'Research news' },
-            { value: 'trials', label: 'Clinical trials' },
-          ]}
-          value={prefs.kinds}
-          onChange={(kinds) => onChange({ ...prefs, kinds: kinds.length ? kinds : prefs.kinds })}
-        />
-      </Field>
       <Field
-        label="Studies to show"
+        label="Topics you care about"
         hint={
-          prefs.depth === 'patient'
-            ? 'Trials, reviews, guidelines, and studies of people with lupus. Skips lab and animal research.'
-            : 'Also includes lab research on how lupus works (more technical).'
+          section === 'news'
+            ? 'Shown under My topics. These are shared with the Library (For you). You can still browse everything.'
+            : 'Shown under For you. These are shared with News (My topics). You can still browse everything.'
         }>
-        <Segmented
-          options={[
-            { value: 'patient', label: 'About patients' },
-            { value: 'all', label: 'Include lab research' },
-          ]}
-          value={prefs.depth}
-          onChange={(depth) => onChange({ ...prefs, depth })}
+        <ToggleChips<TopicId>
+          options={shown.map((t) => ({ value: t.id, label: t.label }))}
+          value={prefs.topics.filter((id) => shownIds.includes(id))}
+          // Keep picks for topics only the other section uses.
+          onChange={(topics) =>
+            onChange({ ...prefs, topics: [...prefs.topics.filter((id) => !shownIds.includes(id)), ...topics] })
+          }
         />
       </Field>
-      <Field label="Clinical trials" hint="Near you uses the place on your UV card (within about 150 miles).">
-        <Segmented
-          options={[
-            { value: 'near', label: 'Near me' },
-            { value: 'any', label: 'Anywhere' },
-          ]}
-          value={prefs.trialsNearMe ? 'near' : 'any'}
-          onChange={(v) => onChange({ ...prefs, trialsNearMe: v === 'near' })}
-        />
-      </Field>
+      {section === 'library' && (
+        <Field
+          label="Reading length"
+          hint="Where the Library's length filter starts. You can switch it any time under More filters.">
+          <Segmented
+            options={[
+              { value: 'any', label: 'Any length' },
+              { value: 'quick', label: 'Quick reads' },
+              { value: 'long', label: 'In depth' },
+            ]}
+            value={prefs.libraryLength}
+            onChange={(libraryLength) => onChange({ ...prefs, libraryLength })}
+          />
+        </Field>
+      )}
+      {section === 'news' && (
+        <>
+          <Field label="In your news feed">
+            <ToggleChips<FeedKind>
+              options={[
+                { value: 'studies', label: 'New studies' },
+                { value: 'news', label: 'Research news' },
+                { value: 'trials', label: 'Clinical trials' },
+              ]}
+              value={prefs.kinds}
+              onChange={(kinds) => onChange({ ...prefs, kinds: kinds.length ? kinds : prefs.kinds })}
+            />
+          </Field>
+          <Field
+            label="Studies to show"
+            hint={
+              prefs.depth === 'patient'
+                ? 'Trials, reviews, guidelines, and studies of people with lupus. Skips lab and animal research.'
+                : 'Also includes lab research on how lupus works (more technical).'
+            }>
+            <Segmented
+              options={[
+                { value: 'patient', label: 'About patients' },
+                { value: 'all', label: 'Include lab research' },
+              ]}
+              value={prefs.depth}
+              onChange={(depth) => onChange({ ...prefs, depth })}
+            />
+          </Field>
+          <Field label="Clinical trials" hint="Near you uses the place on your UV card (within about 150 miles).">
+            <Segmented
+              options={[
+                { value: 'near', label: 'Near me' },
+                { value: 'any', label: 'Anywhere' },
+              ]}
+              value={prefs.trialsNearMe ? 'near' : 'any'}
+              onChange={(v) => onChange({ ...prefs, trialsNearMe: v === 'near' })}
+            />
+          </Field>
+        </>
+      )}
     </>
   );
 }
 
 /** Shown the first time News or Library opens. */
 export function LearnSetup({
+  section,
   initial,
   personal,
   onDone,
 }: {
+  section: LearnSection;
   initial: LearnPrefs;
   personal: Personal;
   onDone: (p: LearnPrefs) => void;
@@ -80,12 +134,16 @@ export function LearnSetup({
       <View style={styles.inner}>
         <View style={[styles.intro, { backgroundColor: theme.backgroundElement }]}>
           <ThemedText type="smallBold" style={styles.introTitle}>
-            What would you like to see?
+            {section === 'news' ? 'What would you like in your news feed?' : 'What would you like to read about?'}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            News brings in new lupus research, news, and recruiting clinical trials from trusted sources. Library is a
-            hand-picked set of articles from places like Johns Hopkins and the American College of Rheumatology. Pick
-            what matters to you. You can change this any time.
+            {section === 'news'
+              ? 'News brings in new lupus studies, research news, and recruiting clinical trials from trusted sources.'
+              : 'The Library is a hand-picked set of articles from places like Johns Hopkins and the American College of Rheumatology.'}{' '}
+            {initial.topics.length
+              ? 'Your topics are filled in from before; adjust them if you like.'
+              : 'Pick what matters to you.'}{' '}
+            You can change this any time under Preferences.
           </ThemedText>
           {personal.terms.length > 0 && (
             <ThemedText type="small" style={{ color: theme.accent }}>
@@ -98,12 +156,15 @@ export function LearnSetup({
             </ThemedText>
           )}
         </View>
-        <PrefsFields prefs={prefs} onChange={setPrefs} />
-        <ActionButton label="Show my feed" onPress={() => onDone({ ...prefs, setUp: true })} />
+        <PrefsFields section={section} prefs={prefs} onChange={setPrefs} />
+        <ActionButton
+          label={section === 'news' ? 'Show my feed' : 'Show my library'}
+          onPress={() => onDone({ ...prefs, [setUpKey(section)]: true })}
+        />
         <ActionButton
           label="Skip for now (show everything)"
           kind="secondary"
-          onPress={() => onDone({ ...prefs, topics: [], setUp: true })}
+          onPress={() => onDone({ ...initial, [setUpKey(section)]: true })}
         />
       </View>
     </ScrollView>
@@ -112,11 +173,13 @@ export function LearnSetup({
 
 /** Edit preferences later. */
 export function PreferencesSheet({
+  section,
   visible,
   prefs,
   onClose,
   onSave,
 }: {
+  section: LearnSection;
   visible: boolean;
   prefs: LearnPrefs;
   onClose: () => void;
@@ -129,11 +192,11 @@ export function PreferencesSheet({
   return (
     <FormSheet
       visible={visible}
-      title="News & Library preferences"
+      title={section === 'news' ? 'News preferences' : 'Library preferences'}
       saveLabel="Save preferences"
       onClose={onClose}
-      onSave={() => onSave({ ...draft, setUp: true })}>
-      <PrefsFields prefs={draft} onChange={setDraft} />
+      onSave={() => onSave({ ...draft, [setUpKey(section)]: true })}>
+      <PrefsFields section={section} prefs={draft} onChange={setDraft} />
     </FormSheet>
   );
 }

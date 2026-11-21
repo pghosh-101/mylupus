@@ -131,29 +131,48 @@ export const LIBRARY_TOPICS = TOPICS.filter((t) => t.library);
 
 export type FeedKind = 'studies' | 'news' | 'trials';
 
+export type LearnSection = 'news' | 'library';
+
 export type LearnPrefs = {
-  setUp: boolean;
+  /** Whether each section's first-time setup is done. */
+  newsSetUp: boolean;
+  librarySetUp: boolean;
+  /** Shared by both: "My topics" in News and "For you" in Library. */
   topics: TopicId[];
+  // News only
+
   kinds: FeedKind[];
   /** 'patient': studies about people with lupus (trials, reviews, guidelines). 'all' adds lab research. */
   depth: 'patient' | 'all';
   /** Show trials within about 150 miles first. */
   trialsNearMe: boolean;
+  // Library only
+  /** The Library's starting length filter. */
+  libraryLength: 'any' | 'quick' | 'long';
 };
 
 const PREFS_KEY = 'mylupus.learnPrefs';
 const DEFAULT_PREFS: LearnPrefs = {
-  setUp: false,
+  newsSetUp: false,
+  librarySetUp: false,
   topics: [],
   kinds: ['studies', 'news', 'trials'],
   depth: 'patient',
   trialsNearMe: true,
+  libraryLength: 'any',
 };
 
 export async function loadPrefs(): Promise<LearnPrefs> {
   try {
     const raw = await AsyncStorage.getItem(PREFS_KEY);
-    return { ...DEFAULT_PREFS, ...(raw ? JSON.parse(raw) : {}) };
+    const saved: Partial<LearnPrefs> & { setUp?: boolean } = raw ? JSON.parse(raw) : {};
+    // Earlier versions had one setup for both sections.
+    if (saved.setUp && saved.newsSetUp === undefined) {
+      saved.newsSetUp = true;
+      saved.librarySetUp = true;
+    }
+    delete saved.setUp;
+    return { ...DEFAULT_PREFS, ...saved };
   } catch {
     return DEFAULT_PREFS;
   }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ChipRow, FilterToggle, ItemCard, Notice, PillButton } from '@/components/learn/parts';
@@ -37,10 +37,12 @@ export function LibraryView({
   const hasForYou = prefs.topics.length > 0 || personal.terms.length > 0;
   const [topic, setTopic] = useState<TopicFilter>(hasForYou ? 'foryou' : 'all');
   const [source, setSource] = useState<string>('all');
-  const [length, setLength] = useState<Length>('any');
+  const [length, setLength] = useState<Length>(prefs.libraryLength);
   const [sort, setSort] = useState<Sort>('recommended');
   const [search, setSearch] = useState('');
   const [moreFilters, setMoreFilters] = useState(false);
+  // Follow the reading-length preference when it changes.
+  useEffect(() => setLength(prefs.libraryLength), [prefs.libraryLength]);
 
   const savedIds = new Set(saved.map((s) => s.id));
   const related = (a: LibraryArticle) => mentions(`${a.title} ${a.tags.join(' ')}`, personal);
