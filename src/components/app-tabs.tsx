@@ -29,11 +29,9 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Label>Labs</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="chart.xyaxis.line" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="ask">
-        <NativeTabs.Trigger.Label>Ask</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'bubble.left.and.text.bubble.right', selected: 'bubble.left.and.text.bubble.right.fill' }}
-        />
+      <NativeTabs.Trigger name="learn">
+        <NativeTabs.Trigger.Label>Learn</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'books.vertical', selected: 'books.vertical.fill' }} />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

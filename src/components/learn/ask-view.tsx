@@ -14,7 +14,7 @@ import {
   View,
   type ScrollViewInstance,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DEMO } from '@/lib/demo';
 import { CardHeader } from '@/components/card-header';
@@ -49,7 +49,8 @@ const STARTERS = [
  */
 const TAB_BAR_CLEARANCE = Platform.select({ ios: 10, android: 72, default: 0 });
 
-export default function AskScreen() {
+/** The Ask chat, shown in the Learn tab. */
+export function AskView() {
   const theme = useTheme();
   const [convo, setConvo] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState('');
@@ -60,8 +61,12 @@ export default function AskScreen() {
 
   // While typing, the keyboard covers the tab bar, so the input can sit right on top of it.
   useEffect(() => {
-    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardUp(true));
-    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardUp(false));
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () =>
+      setKeyboardUp(true),
+    );
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () =>
+      setKeyboardUp(false),
+    );
     return () => {
       show.remove();
       hide.remove();
@@ -84,8 +89,16 @@ export default function AskScreen() {
     // Show the question immediately.
     setConvo((c) =>
       c
-        ? { ...c, messages: [...c.messages, { role: 'user', content: question, at: Date.now() }] }
-        : { id: 'pending', startedAt: Date.now(), context: '', messages: [{ role: 'user', content: question, at: Date.now() }] },
+        ? {
+            ...c,
+            messages: [...c.messages, { role: 'user', content: question, at: Date.now() }],
+          }
+        : {
+            id: 'pending',
+            startedAt: Date.now(),
+            context: '',
+            messages: [{ role: 'user', content: question, at: Date.now() }],
+          },
     );
     setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
     try {
@@ -110,24 +123,31 @@ export default function AskScreen() {
       setConvo(null);
     };
     if (Platform.OS === 'web') return reset();
-    Alert.alert('Start a new chat?', 'This clears the current conversation. Your next question will use your latest data.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'New chat', onPress: reset },
-    ]);
+    Alert.alert(
+      'Start a new chat?',
+      'This clears the current conversation. Your next question will use your latest data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'New chat', onPress: reset },
+      ],
+    );
   };
 
   const messages = convo?.messages ?? [];
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}>
+    <View style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}>
-        <View style={[styles.header, Platform.OS === 'web' && styles.webTop]}>
+        <View style={styles.header}>
           <ThemedText type="subtitle">Ask MyLupus</ThemedText>
           {messages.length > 0 && (
-            <Pressable onPress={newChat} hitSlop={10} style={[styles.newChat, { backgroundColor: theme.backgroundSelected }]}>
+            <Pressable
+              onPress={newChat}
+              hitSlop={10}
+              style={[styles.newChat, { backgroundColor: theme.backgroundSelected }]}>
               <ThemedText type="button" style={{ color: theme.accent }}>
                 New chat
               </ThemedText>
@@ -156,13 +176,13 @@ export default function AskScreen() {
               <>
                 <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText>
-                    Hi{Settings.name ? ` ${Settings.name}` : ''}. Ask me anything about your logged history: symptoms, sleep, meals, flares,
-                    medications, labs, and UV.
+                    Hi{Settings.name ? ` ${Settings.name}` : ''}. Ask me anything about your logged history: symptoms,
+                    sleep, meals, flares, medications, labs, and UV.
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    I look for patterns in your own data and can search reputable medical sources for general
-                    questions. I can&apos;t diagnose or change your treatment. Each question uses a little API credit
-                    (about 1–3¢, a few cents more when I search the web).
+                    I look for patterns in your own data and can search reputable medical sources for general questions.
+                    I can&apos;t diagnose or change your treatment. Each question uses a little API credit (about 1–3¢,
+                    a few cents more when I search the web).
                   </ThemedText>
                 </View>
                 {DEMO && (
@@ -178,7 +198,11 @@ export default function AskScreen() {
                     onPress={() => send(q)}
                     style={({ pressed }) => [
                       styles.starter,
-                      { borderColor: theme.backgroundSelected, backgroundColor: theme.backgroundElement, opacity: pressed ? 0.6 : 1 },
+                      {
+                        borderColor: theme.backgroundSelected,
+                        backgroundColor: theme.backgroundElement,
+                        opacity: pressed ? 0.6 : 1,
+                      },
                     ]}>
                     <ThemedText type="small">{q}</ThemedText>
                   </Pressable>
@@ -188,7 +212,8 @@ export default function AskScreen() {
               <>
                 {convo?.startedAt && convo.id !== 'pending' ? (
                   <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-                    Using your data as of {formatTime(new Date(convo.startedAt))}. Tap New chat to include newer entries.
+                    Using your data as of {formatTime(new Date(convo.startedAt))}. Tap New chat to include newer
+                    entries.
                   </ThemedText>
                 ) : null}
                 {messages.map((m, i) => {
@@ -226,7 +251,13 @@ export default function AskScreen() {
                   );
                 })}
                 {sending && (
-                  <View style={[styles.bubble, styles.theirs, styles.thinking, { backgroundColor: theme.backgroundElement }]}>
+                  <View
+                    style={[
+                      styles.bubble,
+                      styles.theirs,
+                      styles.thinking,
+                      { backgroundColor: theme.backgroundElement },
+                    ]}>
                     <ActivityIndicator size="small" />
                     <ThemedText type="small" themeColor="textSecondary">
                       Thinking…
@@ -242,7 +273,11 @@ export default function AskScreen() {
           <View
             style={[
               styles.inputBar,
-              { borderColor: theme.backgroundSelected, backgroundColor: theme.background, paddingBottom: inputBottom },
+              {
+                borderColor: theme.backgroundSelected,
+                backgroundColor: theme.background,
+                paddingBottom: inputBottom,
+              },
             ]}>
             {keyboardUp && (
               <Pressable
@@ -266,7 +301,13 @@ export default function AskScreen() {
             <Pressable
               onPress={() => send(draft)}
               disabled={!draft.trim() || sending}
-              style={[styles.send, { backgroundColor: theme.accentFill, opacity: !draft.trim() || sending ? 0.4 : 1 }]}>
+              style={[
+                styles.send,
+                {
+                  backgroundColor: theme.accentFill,
+                  opacity: !draft.trim() || sending ? 0.4 : 1,
+                },
+              ]}>
               <ThemedText type="button" style={{ color: theme.onAccent }}>
                 Send
               </ThemedText>
@@ -274,7 +315,7 @@ export default function AskScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -286,21 +327,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
+    paddingTop: Spacing.one,
     paddingBottom: Spacing.two,
   },
-  webTop: { paddingTop: 80 },
-  newChat: { paddingVertical: Spacing.one + 2, paddingHorizontal: Spacing.three, borderRadius: 999 },
-  scroll: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.four, alignItems: 'center' },
+  newChat: {
+    paddingVertical: Spacing.one + 2,
+    paddingHorizontal: Spacing.three,
+    borderRadius: 999,
+  },
+  scroll: {
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.four,
+    alignItems: 'center',
+  },
   inner: { width: '100%', maxWidth: MaxContentWidth, gap: Spacing.three },
   card: { borderRadius: 20, padding: Spacing.three, gap: Spacing.two },
-  starter: { borderWidth: 1, borderRadius: 14, paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three },
+  starter: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: Spacing.two + 2,
+    paddingHorizontal: Spacing.three,
+  },
   center: { textAlign: 'center' },
-  bubble: { borderRadius: 18, paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three, maxWidth: '88%' },
+  bubble: {
+    borderRadius: 18,
+    paddingVertical: Spacing.two + 2,
+    paddingHorizontal: Spacing.three,
+    maxWidth: '88%',
+  },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 6 },
   theirs: { alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
   thinking: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  sources: { borderTopWidth: 1, marginTop: Spacing.two, paddingTop: Spacing.two, gap: Spacing.one },
+  sources: {
+    borderTopWidth: 1,
+    marginTop: Spacing.two,
+    paddingTop: Spacing.two,
+    gap: Spacing.one,
+  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -318,6 +381,16 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.two + 2,
     fontSize: 16,
   },
-  hide: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  send: { borderRadius: 18, paddingVertical: Spacing.two + 2, paddingHorizontal: Spacing.three },
+  hide: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  send: {
+    borderRadius: 18,
+    paddingVertical: Spacing.two + 2,
+    paddingHorizontal: Spacing.three,
+  },
 });

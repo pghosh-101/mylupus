@@ -39,6 +39,8 @@ Lupus looks different for everyone, and the information that matters most (your 
 
 **Labs.** Scan a lab report photo or type results in. Charts over time with normal ranges, change since the last test, and doctor's notes (for example, "this level is OK for me," which turns off warnings while still flagging a real worsening).
 
+**Learn: News and Library.** A live research feed: new lupus studies from PubMed (via Europe PMC, with citation counts and a PubMed fallback), research news from the Lupus Research Alliance, and recruiting clinical trials near you from ClinicalTrials.gov. Filter by type, topic, time (last month, last year, all time) and sort by newest, most cited, or best match. Items that mention your medications or conditions are marked, and "Explain this study" gives a plain-English summary of the abstract. The Library is a hand-picked, link-checked set of articles from Johns Hopkins, HSS, the American College of Rheumatology, the Lupus Foundation of America, NIH MedlinePlus, and Cleveland Clinic, filterable by topic, source, and length, with a Saved list for appointments. First-time setup asks which topics you care about.
+
 **Ask MyLupus.** A chat assistant that answers questions from your logged history ("What tends to come before my flares?", "Summarize the last 3 months for my rheumatologist"), and searches reputable medical sources for general questions, with citations.
 
 ## How the AI works
@@ -55,7 +57,7 @@ Lupus looks different for everyone, and the information that matters most (your 
 
 ## Tech
 
-React Native + Expo (Expo Router, SDK 58), TypeScript, React Compiler, `react-native-svg` charts, local notifications, `expo-location`, AsyncStorage, the Claude API (via HTTPS), WeatherAPI.com and Open-Meteo for UV.
+React Native + Expo (Expo Router, SDK 58), TypeScript, React Compiler, `react-native-svg` charts, local notifications, `expo-location`, AsyncStorage, the Claude API (via HTTPS), WeatherAPI.com and Open-Meteo for UV, Europe PMC / PubMed, ClinicalTrials.gov, and the Lupus Research Alliance feed.
 
 ## Run it yourself
 
