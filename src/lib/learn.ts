@@ -8,7 +8,7 @@ import { loadSavedPlace } from '@/lib/location';
 import { loadMeds, shortName } from '@/lib/meds';
 
 /**
- * News and Library: live lupus research (Europe PMC, which covers PubMed), news from the Lupus
+ * News and Library: live lupus research (PubMed, with Europe PMC for citation counts), news from the Lupus
  * Research Alliance, recruiting trials from ClinicalTrials.gov, and a hand-picked library of
  * articles from established medical sources. All free, no API keys.
  */
@@ -305,7 +305,12 @@ async function getJSON<T>(url: string, timeoutMs = 20000): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    let res = await fetch(url, { signal: controller.signal });
+    // PubMed allows about 3 requests a second; wait a moment and try once more.
+    if (res.status === 429) {
+      await new Promise((r) => setTimeout(r, 1200));
+      res = await fetch(url, { signal: controller.signal });
+    }
     if (!res.ok) throw new Error(`The source returned an error (${res.status}).`);
     return (await res.json()) as T;
   } catch (e) {
@@ -316,7 +321,7 @@ async function getJSON<T>(url: string, timeoutMs = 20000): Promise<T> {
   }
 }
 
-// --- Studies (Europe PMC) ---------------------------------------------------
+// --- Studies (PubMed, and Europe PMC for citation counts) --------------------
 
 const STUDY_TYPES: [RegExp, string][] = [
   [/practice guideline|^guideline/, 'Guideline'],
@@ -342,13 +347,14 @@ function studyLabel(pubTypes: string): string {
 export type StudyResults = {
   items: FeedItem[];
   total: number;
-  /** Set when Europe PMC was down and PubMed answered instead (no citation counts). */
+  /** Set when "Most cited" was asked for but Europe PMC was down, so PubMed answered by best match. */
   backup?: boolean;
 };
 
 /**
- * Studies from Europe PMC (which mirrors PubMed and adds citation counts). If it's down, the same
- * search runs on PubMed directly, sorted by best match instead of citations.
+ * Studies come from PubMed (US National Library of Medicine), the most dependable source. Only
+ * "Most cited" uses Europe PMC, the one free source with citation counts; if it's down, PubMed
+ * answers by best match instead. Each source backs up the other.
  */
 export async function fetchStudies(
   q: NewsQuery,
@@ -356,10 +362,17 @@ export async function fetchStudies(
   personal: Personal,
   pageSize = 25,
 ): Promise<StudyResults> {
+  if (q.sort === 'popular') {
+    try {
+      return await fetchStudiesEuropePmc(q, prefs, personal, pageSize);
+    } catch {
+      return { ...(await fetchStudiesPubMed(q, prefs, personal, pageSize)), backup: true };
+    }
+  }
   try {
-    return await fetchStudiesEuropePmc(q, prefs, personal, pageSize);
+    return await fetchStudiesPubMed(q, prefs, personal, pageSize);
   } catch {
-    return { ...(await fetchStudiesPubMed(q, prefs, personal, pageSize)), backup: true };
+    return fetchStudiesEuropePmc(q, prefs, personal, pageSize);
   }
 }
 
@@ -423,6 +436,8 @@ async function fetchStudiesPubMed(
       pmid: uid,
     };
   });
+  // PubMed's "newest" means most recently added; show them by publication date.
+  if (q.sort === 'newest') items.sort((a, b) => b.date.localeCompare(a.date));
   return { items, total: Number(found.esearchresult.count) };
 }
 
@@ -713,8 +728,29 @@ export async function toggleSaved(item: Omit<SavedItem, 'savedAt'>): Promise<Sav
 
 const EXPLAIN_KEY = 'mylupus.studyExplanations';
 
-/** A study's abstract, from Europe PMC or (if it's down) PubMed. */
+/** A study's abstract, from PubMed or (if it's down) Europe PMC. */
 async function fetchAbstract(pmid: string): Promise<string> {
+  // PubMed first: the abstract's labeled sections (Background, Methods, Results...) as plain text.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const res = await fetch(
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmid}&retmode=xml`,
+      { signal: controller.signal },
+    );
+    if (res.ok) {
+      const xml = await res.text();
+      const parts = [...xml.matchAll(/<AbstractText([^>]*)>([\s\S]*?)<\/AbstractText>/g)].map(([, attrs, text]) => {
+        const label = attrs.match(/Label="([^"]+)"/)?.[1];
+        return `${label ? `${label}: ` : ''}${cleanTitle(text)}`;
+      });
+      if (parts.length) return parts.join('\n');
+    }
+  } catch {
+    // Try Europe PMC.
+  } finally {
+    clearTimeout(timer);
+  }
   try {
     const data = await getJSON<{ resultList: { result: { abstractText?: string }[] } }>(
       `https://www.ebi.ac.uk/europepmc/webservices/rest/search?${new URLSearchParams({
@@ -723,23 +759,9 @@ async function fetchAbstract(pmid: string): Promise<string> {
         resultType: 'core',
       })}`,
     );
-    const text = cleanTitle(data.resultList.result[0]?.abstractText ?? '');
-    if (text) return text;
-  } catch {
-    // Try PubMed.
-  }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  try {
-    const res = await fetch(
-      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmid}&rettype=abstract&retmode=text`,
-      { signal: controller.signal },
-    );
-    return res.ok ? (await res.text()).trim() : '';
+    return cleanTitle(data.resultList.result[0]?.abstractText ?? '');
   } catch {
     return '';
-  } finally {
-    clearTimeout(timer);
   }
 }
 

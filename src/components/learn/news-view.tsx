@@ -227,8 +227,7 @@ export function NewsView({
         )}
         {k === 'studies' && section?.status === 'ready' && section.backup && (
           <ThemedText type="small" themeColor="textSecondary">
-            Europe PMC is briefly unavailable, so these come straight from PubMed
-            {effectiveSort === 'popular' ? ', sorted by best match (citation counts are unavailable for now)' : ''}.
+            Citation counts are briefly unavailable, so these are sorted by best match instead.
           </ThemedText>
         )}
         {section?.status === 'loading' && items.length === 0 && (
