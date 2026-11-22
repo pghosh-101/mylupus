@@ -11,6 +11,7 @@ import {
   Segmented,
   Stepper,
 } from '@/components/meds/controls';
+import { SymptomChips } from '@/components/log/symptom-chips';
 import { ThemedText } from '@/components/themed-text';
 import { FLARE_TRIGGERS, SYMPTOMS, type DurationApprox, type Flare, type MedicalHistory } from '@/lib/daily';
 import { newId, todayString } from '@/lib/meds';
@@ -192,7 +193,7 @@ export function HistoryEditor({
           </Field>
 
           <Field label="Symptoms">
-            <MultiChips options={[...SYMPTOMS, "Raynaud's"]} value={symptoms} onChange={setSymptoms} />
+            <SymptomChips base={[...SYMPTOMS, "Raynaud's"]} value={symptoms} onChange={setSymptoms} />
           </Field>
 
           <Field label="Possible triggers">

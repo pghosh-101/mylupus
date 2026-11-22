@@ -63,7 +63,8 @@ export type SleepEntry = { date: string; hours: number; quality: 'poor' | 'ok' |
 
 export type EveningEntry = {
   date: string;
-  symptoms: Partial<Record<Symptom, Level>>;
+  /** Built-in symptoms plus any you added yourself. */
+  symptoms: Partial<Record<string, Level>>;
   stress: Level;
   diet: 'well' | 'so-so' | 'poorly' | null;
   dietTags: string[];
@@ -136,6 +137,7 @@ const KEYS = {
   flares: 'mylupus.flares',
   history: 'mylupus.history',
   weather: 'mylupus.weatherLog',
+  customSymptoms: 'mylupus.customSymptoms',
 };
 
 async function read<T>(key: string, fallback: T): Promise<T> {
@@ -160,6 +162,27 @@ export const loadEvening = () => read<Record<string, EveningEntry>>(KEYS.evening
 export const loadRaynaud = () => read<RaynaudEvent[]>(KEYS.raynaud, []);
 export const loadFlares = () => read<Flare[]>(KEYS.flares, []);
 export const loadHistory = () => read<MedicalHistory>(KEYS.history, EMPTY_HISTORY);
+/** Symptoms you added yourself, shown alongside the built-in ones. */
+export const loadCustomSymptoms = () => read<string[]>(KEYS.customSymptoms, []);
+
+/** Save a new symptom name (ignored if it already exists, in any letter case). Returns the full list. */
+export async function addCustomSymptom(name: string): Promise<string[]> {
+  const list = await loadCustomSymptoms();
+  const clean = name.trim().replace(/\s+/g, ' ');
+  const taken = [...SYMPTOMS, "Raynaud's", ...list].some((s) => s.toLowerCase() === clean.toLowerCase());
+  if (!clean || taken) return list;
+  const next = [...list, clean.charAt(0).toUpperCase() + clean.slice(1)];
+  await write(KEYS.customSymptoms, next);
+  return next;
+}
+
+/** Remove a symptom you added from the choices. Past entries keep it. */
+export async function removeCustomSymptom(name: string): Promise<string[]> {
+  const next = (await loadCustomSymptoms()).filter((s) => s !== name);
+  await write(KEYS.customSymptoms, next);
+  return next;
+}
+
 export const loadWeatherLog = () => read<Record<string, DayWeather>>(KEYS.weather, {});
 
 export async function saveSleep(entry: SleepEntry) {
@@ -341,8 +364,9 @@ export async function weeklyInsights(): Promise<Insight[]> {
     });
   }
 
-  // Symptoms trending up: last 3 days vs the 4 before
-  for (const s of SYMPTOMS) {
+  // Symptoms trending up: last 3 days vs the 4 before (including symptoms you added)
+  const symptomNames = [...new Set([...SYMPTOMS, ...week.flatMap((d) => Object.keys(evening[d]?.symptoms ?? {}))])];
+  for (const s of symptomNames) {
     const levels = week.map((d) => evening[d]?.symptoms[s]);
     const recent = levels.slice(4).filter((x): x is Level => x !== undefined);
     const before = levels.slice(0, 4).filter((x): x is Level => x !== undefined);

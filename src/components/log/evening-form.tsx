@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { SymptomChips } from '@/components/log/symptom-chips';
 import { Field, FormSheet, Input, MultiChips, Segmented, Stepper } from '@/components/meds/controls';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { DIET_TAGS, SYMPTOMS, type EveningEntry, type Level, type Symptom } from '@/lib/daily';
+import { DIET_TAGS, SYMPTOMS, type EveningEntry, type Level } from '@/lib/daily';
 
 const LEVELS: { value: Level; label: string }[] = [
   { value: 0, label: 'None' },
@@ -26,7 +27,9 @@ export function EveningForm({
   onSave: (e: EveningEntry) => void;
   onClose: () => void;
 }) {
-  const [symptoms, setSymptoms] = useState<Partial<Record<Symptom, Level>>>({});
+  const [symptoms, setSymptoms] = useState<Partial<Record<string, Level>>>({});
+  /** Every symptom shown as a choice (built-in and ones you added). */
+  const [allSymptoms, setAllSymptoms] = useState<string[]>([...SYMPTOMS]);
   const [stress, setStress] = useState<Level>(0);
   const [diet, setDiet] = useState<EveningEntry['diet']>(null);
   const [dietTags, setDietTags] = useState<string[]>([]);
@@ -47,25 +50,32 @@ export function EveningForm({
 
   const save = () => {
     // Untouched symptoms count as "none" so every day has a full record.
-    const full = Object.fromEntries(SYMPTOMS.map((s) => [s, symptoms[s] ?? 0])) as Record<Symptom, Level>;
+    const names = [...new Set([...allSymptoms, ...Object.keys(symptoms)])];
+    const full = Object.fromEntries(names.map((s) => [s, symptoms[s] ?? 0])) as Record<string, Level>;
     onSave({ date, symptoms: full, stress, diet, dietTags, homeMeals, outMeals, notes: notes.trim() });
   };
 
   return (
     <FormSheet visible={visible} title="How was today?" saveLabel="Save check-in" onClose={onClose} onSave={save}>
       <Field label="Any symptoms today?" hint="Tap the ones you had. Leave blank for a good day.">
-        <MultiChips
-          options={SYMPTOMS}
-          value={SYMPTOMS.filter((s) => (symptoms[s] ?? 0) > 0)}
+        <SymptomChips
+          base={SYMPTOMS}
+          value={Object.keys(symptoms).filter((s) => (symptoms[s] ?? 0) > 0)}
+          onOptionsChange={setAllSymptoms}
           onChange={(picked) =>
             setSymptoms(
               Object.fromEntries(
-                SYMPTOMS.map((s) => [s, picked.includes(s) ? Math.max(1, symptoms[s] ?? 0) : 0]),
-              ) as Record<Symptom, Level>,
+                [...new Set([...Object.keys(symptoms), ...picked])].map((s) => [
+                  s,
+                  picked.includes(s) ? Math.max(1, symptoms[s] ?? 0) : 0,
+                ]),
+              ) as Record<string, Level>,
             )
           }
         />
-        {SYMPTOMS.filter((s) => (symptoms[s] ?? 0) > 0).map((s) => (
+        {Object.keys(symptoms)
+          .filter((s) => (symptoms[s] ?? 0) > 0)
+          .map((s) => (
           <View key={s} style={styles.symptom}>
             <ThemedText type="small">{s}</ThemedText>
             <Segmented
