@@ -90,7 +90,11 @@ export function TestDetail({
             </ThemedText>
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="interactive">
           {info && (
             <ThemedText type="small" themeColor="textSecondary">
               {info.about}

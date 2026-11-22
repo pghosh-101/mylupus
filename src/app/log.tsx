@@ -6,8 +6,8 @@ import { CardHeader } from '@/components/card-header';
 import { CheckinCard } from '@/components/log/checkin-cards';
 import { DaySheet } from '@/components/log/day-sheet';
 import { flareDates, MonthCalendar } from '@/components/log/month-calendar';
-import { FlareForm } from '@/components/log/flare-form';
-import { HistoryForm } from '@/components/log/history-form';
+import { HistoryEditor, type HistoryEditing } from '@/components/log/history-editor';
+import { flareWhen, HistoryTimeline, SEVERITY_LABEL, formatStart } from '@/components/log/history-timeline';
 import { ActionButton } from '@/components/meds/controls';
 import { Card, Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -29,22 +29,15 @@ import {
   type SleepEntry,
 } from '@/lib/daily';
 
-const SEVERITY = ['', 'Mild', 'Moderate', 'Severe'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function flareDate(start: string) {
-  const [y, m, d] = start.split('-').map(Number);
-  return d ? `${MONTHS[m - 1]} ${d}, ${y}` : `${MONTHS[m - 1]} ${y}`;
-}
-
 export default function LogScreen() {
+  const theme = useTheme();
   const [insights, setInsights] = useState<Insight[]>([]);
   const [flares, setFlares] = useState<Flare[]>([]);
   const [history, setHistory] = useState<MedicalHistory>(EMPTY_HISTORY);
   const [sleep, setSleep] = useState<Record<string, SleepEntry>>({});
   const [evening, setEvening] = useState<Record<string, EveningEntry>>({});
-  const [editingFlare, setEditingFlare] = useState<Flare | 'new' | null>(null);
-  const [editingHistory, setEditingHistory] = useState(false);
+  const [editing, setEditing] = useState<HistoryEditing | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [pickedDay, setPickedDay] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -72,13 +65,29 @@ export default function LogScreen() {
     const next = flares.some((f) => f.id === flare.id)
       ? flares.map((f) => (f.id === flare.id ? flare : f))
       : [...flares, flare];
-    setEditingFlare(null);
+    setEditing(null);
     setFlares(next);
     await saveFlares(next);
   };
+  const deleteFlare = async (id: string) => {
+    const next = flares.filter((f) => f.id !== id);
+    setEditing(null);
+    setFlares(next);
+    await saveFlares(next);
+  };
+  const saveBackground = async (h: MedicalHistory) => {
+    setEditing(null);
+    setHistory(h);
+    await saveHistory(h);
+  };
 
-  const sortedFlares = [...flares].sort((a, b) => b.start.localeCompare(a.start));
-  const historyFilled = Object.values(history).some(Boolean);
+  const ongoing = flares.filter((f) => f.ongoing).sort((a, b) => b.start.localeCompare(a.start));
+  const past = flares.filter((f) => !f.ongoing).sort((a, b) => b.start.localeCompare(a.start));
+  const summary = [
+    flares.length ? `${flares.length} flare${flares.length === 1 ? '' : 's'} logged` : '',
+    past[0] ? `last one ${formatStart(past[0].start)}` : '',
+    history.diagnosed ? `diagnosed ${formatStart(history.diagnosed)}` : '',
+  ].filter(Boolean);
 
   return (
     <Screen title="Daily log">
@@ -89,40 +98,57 @@ export default function LogScreen() {
       <InsightsCard insights={insights} />
 
       <Card>
-        <CardHeader icon="flame.fill" title="FLARES" />
-        {sortedFlares.length === 0 && (
-          <ThemedText type="small" themeColor="textSecondary">
-            Log current flares as they happen, and add past ones to give the patterns more history.
-          </ThemedText>
-        )}
-        {sortedFlares.map((f) => (
-          <FlareRow key={f.id} flare={f} onPress={() => setEditingFlare(f)} />
+        <CardHeader icon="clock.arrow.circlepath" title="MY HISTORY" />
+        {ongoing.map((f) => (
+          <Pressable
+            key={f.id}
+            onPress={() => setEditing({ kind: 'flare', flare: f })}
+            style={[styles.ongoing, { borderColor: theme.sunAlert }]}>
+            <View style={styles.flex}>
+              <ThemedText type="smallBold" style={{ color: theme.sunAlert }}>
+                Ongoing flare · {SEVERITY_LABEL[f.severity]}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {flareWhen(f)}
+                {f.symptoms.length ? ` · ${f.symptoms.slice(0, 3).join(', ')}` : ''}
+              </ThemedText>
+            </View>
+            <ThemedText type="small" style={{ color: theme.accent }}>
+              Update
+            </ThemedText>
+          </Pressable>
         ))}
-        <ActionButton label="Log a flare" onPress={() => setEditingFlare('new')} />
-      </Card>
-
-
-      <Card>
-        <CardHeader icon="doc.text.fill" title="MY HISTORY" />
         <ThemedText type="small" themeColor="textSecondary">
-          {historyFilled
-            ? 'Diagnosis, past medications, and other notes saved.'
-            : 'Add your diagnosis date, past medications, and other notes. The AI assistant will use these later.'}
+          {summary.length
+            ? `${summary.join(' · ').replace(/^./, (c) => c.toUpperCase())}.`
+            : 'Log flares (now or in the past) and your health background. They show up in a timeline, and the assistant uses them to spot patterns.'}
         </ThemedText>
-        <ActionButton label={historyFilled ? 'Edit history' : 'Add history'} kind="secondary" onPress={() => setEditingHistory(true)} />
+        <View style={styles.buttons}>
+          <View style={styles.flex}>
+            <ActionButton label="Update history" onPress={() => setEditing({ kind: 'new' })} />
+          </View>
+          <View style={styles.flex}>
+            <ActionButton label="View history" kind="secondary" onPress={() => setTimelineOpen(true)} />
+          </View>
+        </View>
       </Card>
 
-      <FlareForm
-        visible={editingFlare !== null}
-        flare={editingFlare === 'new' ? null : editingFlare}
-        onSave={saveFlare}
-        onDelete={async (id) => {
-          const next = flares.filter((f) => f.id !== id);
-          setEditingFlare(null);
-          setFlares(next);
-          await saveFlares(next);
-        }}
-        onClose={() => setEditingFlare(null)}
+      <HistoryEditor
+        editing={editing}
+        history={history}
+        onSaveFlare={saveFlare}
+        onDeleteFlare={deleteFlare}
+        onSaveHistory={saveBackground}
+        onClose={() => setEditing(null)}
+      />
+      <HistoryTimeline
+        visible={timelineOpen}
+        flares={flares}
+        history={history}
+        onSaveFlare={saveFlare}
+        onDeleteFlare={deleteFlare}
+        onSaveHistory={saveBackground}
+        onClose={() => setTimelineOpen(false)}
       />
       <DaySheet
         date={pickedDay}
@@ -131,16 +157,6 @@ export default function LogScreen() {
         inFlare={pickedDay ? flareDates(flares).has(pickedDay) : false}
         onChanged={reload}
         onClose={() => setPickedDay(null)}
-      />
-      <HistoryForm
-        visible={editingHistory}
-        history={history}
-        onClose={() => setEditingHistory(false)}
-        onSave={async (h) => {
-          setEditingHistory(false);
-          setHistory(h);
-          await saveHistory(h);
-        }}
       />
     </Screen>
   );
@@ -173,28 +189,16 @@ function InsightsCard({ insights }: { insights: Insight[] }) {
   );
 }
 
-function FlareRow({ flare, onPress }: { flare: Flare; onPress: () => void }) {
-  const theme = useTheme();
-  return (
-    <Pressable onPress={onPress} style={[styles.row, { borderColor: theme.backgroundSelected }]}>
-      <View style={styles.flex}>
-        <ThemedText type="smallBold">
-          {flareDate(flare.start)} · {SEVERITY[flare.severity]}
-        </ThemedText>
-        <ThemedText type="small" style={{ color: flare.ongoing ? theme.sunAlert : theme.textSecondary }}>
-          {flare.ongoing ? 'Ongoing' : flare.durationDays ? `Lasted ${flare.durationDays} days` : 'Ended'}
-          {flare.symptoms.length ? ` · ${flare.symptoms.slice(0, 3).join(', ')}` : ''}
-        </ThemedText>
-      </View>
-      <ThemedText type="small" style={{ color: theme.accent }}>
-        Edit
-      </ThemedText>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderTopWidth: 1, paddingTop: Spacing.two },
+  ongoing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    borderLeftWidth: 3,
+    paddingLeft: Spacing.three,
+    paddingVertical: Spacing.one,
+  },
+  buttons: { flexDirection: 'row', gap: Spacing.two },
   flex: { flex: 1, gap: Spacing.half },
   insight: { borderLeftWidth: 3, paddingLeft: Spacing.three, gap: Spacing.half },
   footnote: { marginTop: Spacing.one },

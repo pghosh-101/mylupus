@@ -114,7 +114,11 @@ export function MedForm({ visible, med, routine, onSave, onDelete, onClose }: Pr
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="interactive">
           {!med && (
             <Field label="Quick pick" hint="Fills in typical instructions. Always follow your own prescription label.">
               <Segmented

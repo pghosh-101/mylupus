@@ -1,5 +1,15 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { select, tap } from '@/lib/haptics';
@@ -274,10 +284,22 @@ export function FormSheet({
             </ThemedText>
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={chipStyles.body} keyboardShouldPersistTaps="handled">
-          {children}
-          <ActionButton label={saveLabel} onPress={onSave} />
-        </ScrollView>
+        {/*
+          Keep the field you're typing in above the keyboard. On iPhone the scroll view itself makes
+          room and scrolls the focused field into view (this is right even inside a page sheet, where
+          KeyboardAvoidingView miscounts the sheet's offset). On Android, edge-to-edge windows don't
+          resize, so KeyboardAvoidingView adds the padding.
+        */}
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'android' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={chipStyles.body}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
+            {children}
+            <ActionButton label={saveLabel} onPress={onSave} />
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
