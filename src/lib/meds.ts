@@ -563,7 +563,7 @@ const MAX_DOSE_NOTIFICATIONS = 48;
  * Minutes after a dose is due to remind again if it hasn't been logged. The last one says which
  * doses are waiting on it.
  */
-const REPEAT_AFTER = [0, 15, 30, 45, 60, 90, 120];
+const REPEAT_AFTER = [0, 60, 120];
 
 // Snoozes, saved so they survive the reminders being rescheduled.
 const SNOOZE_KEY = 'mylupus.snoozes';
@@ -573,7 +573,7 @@ const loadSnoozes = () => readJSON<Record<string, number>>(SNOOZE_KEY, {});
  * Replace dose and refill notifications to match the medication list and what's been logged.
  *
  * Each day, only the next dose that hasn't been logged gets reminders: at its time, then again
- * every 15 to 30 minutes for 2 hours until you tap Taken, Snooze, or Skip. Doses after it wait,
+ * 1 and 2 hours later until you tap Taken, Snooze, or Skip. Doses after it wait,
  * because their times depend on when you actually take it; they're scheduled as soon as it's
  * logged. Called whenever the app opens or something is logged.
  */

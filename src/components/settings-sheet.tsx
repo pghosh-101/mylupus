@@ -16,7 +16,7 @@ const REMINDERS: { key: keyof Notify; label: string; hint: string }[] = [
   {
     key: 'meds',
     label: 'Medication reminders',
-    hint: 'Repeats until you log the dose. Also refill reminders.',
+    hint: 'Repeats 1 and 2 hours later if you haven’t logged the dose. Also refill reminders.',
   },
   { key: 'morningUv', label: 'Morning UV alert', hint: "Today's peak UV and the hours above your limit." },
   { key: 'sunscreen', label: 'Sunscreen reapply', hint: '2 hours after you put it on, if UV is still high.' },
