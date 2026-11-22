@@ -74,12 +74,32 @@ export type EveningEntry = {
 
 export type RaynaudEvent = { at: number; tempF: number | null };
 
+export type DurationApprox = 'days' | 'week' | 'weeks' | 'month' | 'unknown';
+
+export const DURATION_APPROX_LABEL: Record<DurationApprox, string> = {
+  days: 'a few days',
+  week: 'about a week',
+  weeks: 'a few weeks',
+  month: 'a month or more',
+  unknown: 'length not sure',
+};
+
+/** "Lasted 4 days", "Lasted about a week", "Ongoing", or "Length not sure". */
+export function flareLength(f: Flare): string {
+  if (f.ongoing) return 'Ongoing';
+  if (f.durationDays) return `Lasted ${f.durationDays} day${f.durationDays === 1 ? '' : 's'}`;
+  if (f.durationApprox && f.durationApprox !== 'unknown') return `Lasted ${DURATION_APPROX_LABEL[f.durationApprox]}`;
+  return 'Length not sure';
+}
+
 export type Flare = {
   id: string;
   /** "YYYY-MM-DD", or "YYYY-MM" when only the month is known. */
   start: string;
-  /** Days it lasted, or null if ongoing / unknown. */
+  /** Days it lasted, when known exactly. Null if ongoing, approximate, or unknown. */
   durationDays: number | null;
+  /** A rough length, for flares without an exact number of days. */
+  durationApprox?: DurationApprox;
   ongoing: boolean;
   severity: 1 | 2 | 3;
   symptoms: string[];

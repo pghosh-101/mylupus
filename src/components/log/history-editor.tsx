@@ -12,7 +12,7 @@ import {
   Stepper,
 } from '@/components/meds/controls';
 import { ThemedText } from '@/components/themed-text';
-import { FLARE_TRIGGERS, SYMPTOMS, type Flare, type MedicalHistory } from '@/lib/daily';
+import { FLARE_TRIGGERS, SYMPTOMS, type DurationApprox, type Flare, type MedicalHistory } from '@/lib/daily';
 import { newId, todayString } from '@/lib/meds';
 
 /** What the editor is open for. */
@@ -50,6 +50,8 @@ export function HistoryEditor({
   const [day, setDay] = useState<number | null>(Number(today.slice(8)));
   const [ongoing, setOngoing] = useState(true);
   const [duration, setDuration] = useState(7);
+  /** 'exact' uses the day count; otherwise a rough length. */
+  const [length, setLength] = useState<DurationApprox | 'exact'>('unknown');
   const [severity, setSeverity] = useState<Flare['severity']>(2);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [triggers, setTriggers] = useState<string[]>([]);
@@ -66,6 +68,7 @@ export function HistoryEditor({
     setDay(start.length > 7 ? Number(start.slice(8)) : null);
     setOngoing(existing?.ongoing ?? true);
     setDuration(existing?.durationDays ?? 7);
+    setLength(existing?.durationDays ? 'exact' : (existing?.durationApprox ?? 'unknown'));
     setSeverity(existing?.severity ?? 2);
     setSymptoms(existing?.symptoms ?? []);
     setTriggers(existing?.triggers ?? []);
@@ -84,7 +87,8 @@ export function HistoryEditor({
       id: existing?.id ?? newId(),
       start: day ? `${month}-${String(Math.min(day, daysInMonth)).padStart(2, '0')}` : month,
       ongoing,
-      durationDays: ongoing ? null : duration,
+      durationDays: ongoing || length !== 'exact' ? null : duration,
+      durationApprox: ongoing || length === 'exact' ? undefined : length,
       severity,
       symptoms,
       triggers,
@@ -147,14 +151,33 @@ export function HistoryEditor({
               value={ongoing ? 'yes' : 'no'}
               onChange={(v) => setOngoing(v === 'yes')}
             />
-            {!ongoing && (
-              <Stepper
-                label={`Lasted ${duration} day${duration === 1 ? '' : 's'}`}
-                onMinus={() => setDuration(Math.max(1, duration - 1))}
-                onPlus={() => setDuration(Math.min(365, duration + 1))}
-              />
-            )}
           </Field>
+
+          {!ongoing && (
+            <Field
+              label="How long did it last?"
+              hint="A rough guess is fine. Flares come and go, so pick whatever feels closest.">
+              <Segmented<DurationApprox | 'exact'>
+                options={[
+                  { value: 'days', label: 'A few days' },
+                  { value: 'week', label: 'About a week' },
+                  { value: 'weeks', label: 'A few weeks' },
+                  { value: 'month', label: 'A month or more' },
+                  { value: 'unknown', label: 'Not sure' },
+                  { value: 'exact', label: 'Exact days' },
+                ]}
+                value={length}
+                onChange={setLength}
+              />
+              {length === 'exact' && (
+                <Stepper
+                  label={`Lasted ${duration} day${duration === 1 ? '' : 's'}`}
+                  onMinus={() => setDuration(Math.max(1, duration - 1))}
+                  onPlus={() => setDuration(Math.min(365, duration + 1))}
+                />
+              )}
+            </Field>
+          )}
 
           <Field label="How bad">
             <Segmented

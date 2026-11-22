@@ -7,7 +7,7 @@ import { ActionButton, Segmented } from '@/components/meds/controls';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { Flare, MedicalHistory } from '@/lib/daily';
+import { DURATION_APPROX_LABEL, flareLength, type Flare, type MedicalHistory } from '@/lib/daily';
 import { tap } from '@/lib/haptics';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -24,7 +24,11 @@ export function formatStart(start: string, withYear = true) {
 export function flareWhen(f: Flare) {
   if (f.ongoing) return `Since ${formatStart(f.start)}`;
   if (f.start.length === 7 || !f.durationDays) {
-    return `${formatStart(f.start)}${f.durationDays ? ` · about ${f.durationDays} day${f.durationDays === 1 ? '' : 's'}` : ''}`;
+    if (f.durationDays)
+      return `${formatStart(f.start)} · about ${f.durationDays} day${f.durationDays === 1 ? '' : 's'}`;
+    const rough =
+      f.durationApprox && f.durationApprox !== 'unknown' ? ` · ${DURATION_APPROX_LABEL[f.durationApprox]}` : '';
+    return `${formatStart(f.start)}${rough}`;
   }
   const [y, m, d] = f.start.split('-').map(Number);
   const end = new Date(y, m - 1, d + f.durationDays - 1);
@@ -321,13 +325,7 @@ function FlareBox({
         <>
           <Detail
             label="How long"
-            value={
-              flare.ongoing
-                ? `Ongoing since ${formatStart(flare.start)}`
-                : flare.durationDays
-                  ? `${flare.durationDays} day${flare.durationDays === 1 ? '' : 's'}`
-                  : 'Not recorded'
-            }
+            value={flare.ongoing ? `Ongoing since ${formatStart(flare.start)}` : flareLength(flare)}
           />
           {flare.symptoms.length > 0 && <Chips label="Symptoms" items={flare.symptoms} />}
           {flare.triggers.length > 0 && <Chips label="Possible triggers" items={flare.triggers} />}

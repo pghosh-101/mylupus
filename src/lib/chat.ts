@@ -4,6 +4,7 @@ import { demoAnswer } from '@/lib/demo-content';
 import { DEMO } from '@/lib/demo';
 import { createMessage, type ContentBlock } from '@/lib/ai';
 import {
+  flareLength,
   lastDates,
   LEVEL_LABEL,
   loadEvening,
@@ -226,7 +227,7 @@ export async function buildContext(): Promise<string> {
   for (const f of [...flares].sort((a, b) => a.start.localeCompare(b.start))) {
     out.push(
       `- Started ${f.start}${f.start.length === 7 ? ' (month only)' : ''}; ${['', 'mild', 'moderate', 'severe'][f.severity]}; ` +
-        (f.ongoing ? 'ongoing' : f.durationDays ? `lasted ${f.durationDays} days` : 'ended') +
+        flareLength(f).toLowerCase() +
         (f.symptoms.length ? `; symptoms: ${f.symptoms.join(', ')}` : '') +
         (f.triggers.length ? `; suspected triggers: ${f.triggers.join(', ')}` : '') +
         (f.treatment ? `; treatment: ${f.treatment}` : '') +
