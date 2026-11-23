@@ -205,6 +205,14 @@ export async function logRaynaud(event: RaynaudEvent) {
   await write(KEYS.raynaud, all.slice(-2000));
 }
 
+/** Remove one Raynaud's episode (identified by when it was logged). */
+export async function removeRaynaud(at: number) {
+  const all = await loadRaynaud();
+  const i = all.findIndex((e) => e.at === at);
+  if (i >= 0) all.splice(i, 1);
+  await write(KEYS.raynaud, all);
+}
+
 export async function saveFlares(flares: Flare[]) {
   await write(KEYS.flares, flares);
 }

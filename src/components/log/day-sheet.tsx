@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CardHeader } from '@/components/card-header';
 import { EveningForm } from '@/components/log/evening-form';
+import { RaynaudList } from '@/components/log/raynaud-list';
 import { SleepForm } from '@/components/log/sleep-form';
 import { ActionButton } from '@/components/meds/controls';
 import { Card } from '@/components/screen';
@@ -12,14 +13,16 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   LEVEL_LABEL,
+  loadRaynaud,
   loadWeatherLog,
   saveEvening,
   saveSleep,
   warningSigns,
   type EveningEntry,
+  type RaynaudEvent,
   type SleepEntry,
 } from '@/lib/daily';
-import { loadDoseLog, loadMeds, parseDate, shortName } from '@/lib/meds';
+import { loadDoseLog, loadMeds, parseDate, shortName, todayString } from '@/lib/meds';
 import type { DayWeather } from '@/lib/uv';
 
 /** One day: everything logged, with buttons to fill in or edit its check-ins. */
@@ -42,11 +45,14 @@ export function DaySheet({
   const [form, setForm] = useState<'sleep' | 'evening' | null>(null);
   const [doses, setDoses] = useState<string[]>([]);
   const [weather, setWeather] = useState<DayWeather | null>(null);
+  const [raynaud, setRaynaud] = useState<RaynaudEvent[]>([]);
+  const [raynaudTick, setRaynaudTick] = useState(0);
 
   useEffect(() => {
     if (!date) return;
     (async () => {
-      const [meds, log, w] = await Promise.all([loadMeds(), loadDoseLog(), loadWeatherLog()]);
+      const [meds, log, w, r] = await Promise.all([loadMeds(), loadDoseLog(), loadWeatherLog(), loadRaynaud()]);
+      setRaynaud(r.filter((e) => todayString(new Date(e.at)) === date));
       setDoses(
         log
           .filter((e) => e.key.startsWith(`${date}|`))
@@ -59,7 +65,7 @@ export function DaySheet({
       );
       setWeather(w[date] ?? null);
     })();
-  }, [date]);
+  }, [date, raynaudTick]);
 
   if (!date) return null;
   const title = parseDate(date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
@@ -119,6 +125,19 @@ export function DaySheet({
             <CardHeader icon="pills.fill" title="MEDICATIONS" />
             {doses.length ? doses.map((d) => <ThemedText key={d} type="small">{d}</ThemedText>) : <ThemedText>Nothing logged</ThemedText>}
           </Card>
+
+          {raynaud.length > 0 && (
+            <Card>
+              <CardHeader icon="hand.raised.fill" title="RAYNAUD'S" />
+              <RaynaudList
+                episodes={raynaud}
+                onChanged={() => {
+                  setRaynaudTick((t) => t + 1);
+                  onChanged();
+                }}
+              />
+            </Card>
+          )}
 
           {weather && (
             <Card>

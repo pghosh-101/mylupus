@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { CardHeader } from '@/components/card-header';
 import { EveningForm } from '@/components/log/evening-form';
+import { RaynaudList } from '@/components/log/raynaud-list';
 import { SleepForm } from '@/components/log/sleep-form';
 import { ActionButton } from '@/components/meds/controls';
 import { Card } from '@/components/screen';
@@ -12,12 +13,14 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   loadEvening,
+  loadRaynaud,
   loadSleep,
   logRaynaud,
   saveEvening,
   saveSleep,
   warningSigns,
   type EveningEntry,
+  type RaynaudEvent,
   type SleepEntry,
 } from '@/lib/daily';
 import { loadSavedPlace } from '@/lib/location';
@@ -39,12 +42,14 @@ export function CheckinCard({
   const [evening, setEvening] = useState<EveningEntry | null>(null);
   const [form, setForm] = useState<'sleep' | 'evening' | null>(null);
   const [raynaudNote, setRaynaudNote] = useState<string | null>(null);
+  const [raynaud, setRaynaud] = useState<RaynaudEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const reload = useCallback(async () => {
-    const [s, e] = await Promise.all([loadSleep(), loadEvening()]);
+    const [s, e, r] = await Promise.all([loadSleep(), loadEvening(), loadRaynaud()]);
     setSleep(s[today] ?? null);
     setEvening(e[today] ?? null);
+    setRaynaud(r.filter((ev) => todayString(new Date(ev.at)) === today));
     setLoaded(true);
   }, [today]);
 
@@ -64,6 +69,7 @@ export function CheckinCard({
     }
     await logRaynaud({ at: Date.now(), tempF });
     setRaynaudNote(`Raynaud's logged at ${formatTime(new Date())}${tempF !== null ? ` (${Math.round(tempF)}°F outside)` : ''}.`);
+    await reload();
     onSaved?.();
   };
 
@@ -109,6 +115,21 @@ export function CheckinCard({
             </ThemedText>
           </View>
           <ActionButton label="Log now" kind="secondary" onPress={logRaynaudNow} />
+        </View>
+      )}
+      {!compact && raynaud.length > 0 && (
+        <View style={styles.episodes}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Today: {raynaud.length} episode{raynaud.length === 1 ? '' : 's'}
+          </ThemedText>
+          <RaynaudList
+            episodes={raynaud}
+            onChanged={async () => {
+              setRaynaudNote(null);
+              await reload();
+              onSaved?.();
+            }}
+          />
         </View>
       )}
 
@@ -189,4 +210,5 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   flex: { flex: 1, gap: Spacing.half },
+  episodes: { gap: Spacing.two, paddingLeft: Spacing.three },
 });
