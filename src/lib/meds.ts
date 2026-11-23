@@ -287,6 +287,11 @@ export type PlannedDose = {
   entry: DoseLogEntry | null;
   /** For taken doses: minutes from midnight of the plan's day. */
   takenAt: Minutes | null;
+  /**
+   * For pending doses: the earliest time the food and spacing rules allow, based on what you've
+   * actually logged (e.g. 2 hours after the meal you ate). Null when nothing logged limits it.
+   */
+  earliest?: Minutes | null;
 };
 
 /** Format plan minutes, which may run past midnight. */
@@ -348,19 +353,26 @@ const hoursText = (min: number) => {
   return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`;
 };
 
+/** Logged items move the pending items scheduled within this many minutes after them. */
+const FOLLOW_WINDOW = 240;
+/** The most a logged time can pull a pending item earlier than its usual time. */
+const MAX_EARLIER = 60;
+
 /**
- * The day's doses and routine events, with pending items pushed later (never earlier) based on
- * what actually happened:
- * - Waking up later than usual shifts the morning (items within 4 h of your usual wake time) by the
- *   same amount; later items move only as the other rules require.
- * - A meal waits at least min(usual gap, 3 h) after the previous meal, and 1 h after an
- *   empty-stomach dose.
+ * The day's doses and routine events, adjusted to what actually happened:
+ * - When you log something (waking up, a meal, a dose) earlier or later than usual, the pending
+ *   items scheduled within 4 hours after it shift by the same amount, so your usual gaps hold.
+ *   Shifting earlier is limited to 1 hour.
  * - With-food doses line up with their meal (one scheduled within 90 min of the dose).
- * - Empty-stomach doses wait 2 h after a logged meal or a with-food dose.
- * - Doses keep `spacingHours` from other medications, and repeat doses of the same medication keep
- *   their usual gap (up to 1 h shorter).
+ * - Safety rules always win, pushing items later when needed:
+ *   - A meal waits at least min(usual gap, 3 h) after the previous meal, and 1 h after an
+ *     empty-stomach dose.
+ *   - Empty-stomach doses wait 2 h after a logged meal or a with-food dose.
+ *   - Doses keep `spacingHours` from other medications, and repeat doses of the same medication
+ *     keep their usual gap (up to 1 h shorter).
  * - A dose that's overdue and not logged yet counts as happening now, so the doses that depend on
  *   it keep moving later until it's taken or skipped (pass `now`).
+ * Pending doses also get `earliest`: the soonest the rules allow, from what you've logged.
  * Without a routine, only the dose rules apply.
  */
 export function planTimeline(
@@ -389,6 +401,7 @@ export function planTimeline(
         reason: null,
         entry,
         takenAt: entry?.status === 'taken' ? toMinutes(entry.at) : null,
+        earliest: null,
       };
     }),
   );
@@ -411,39 +424,70 @@ export function planTimeline(
     (a, b) => a.scheduled - b.scheduled || (a.kind === 'routine' ? -1 : 1) - (b.kind === 'routine' ? -1 : 1),
   );
 
-  let wakeShift = 0;
-  /** Only the morning moves with a late wake-up; the rest of the day follows the other rules. */
-  const inMorning = (scheduled: Minutes) => (routine ? scheduled < routine.wake + 240 : false);
+  /** The most recent thing you logged, which later items follow. */
+  let anchor: { scheduled: Minutes; actual: Minutes; label: string } | null = null;
   let lastMeal: { event: RoutineEvent; scheduled: Minutes; time: Minutes; logged: boolean } | null = null;
-  let lastEmptyDose: { med: Medication; time: Minutes; waiting: boolean } | null = null;
-  const doseEvents: { med: Medication; scheduled: Minutes; time: Minutes; waiting: boolean }[] = [];
+  let lastEmptyDose: { med: Medication; time: Minutes; waiting: boolean; logged: boolean } | null = null;
+  const doseEvents: { med: Medication; scheduled: Minutes; time: Minutes; waiting: boolean; logged: boolean }[] = [];
   const mealTimes = new Map<RoutineEvent, Minutes>();
 
-  const push = (item: TimelineItem, earliest: number, why: string) => {
-    if (earliest > item.planned) {
-      item.planned = round5(earliest);
-      item.reason = why;
+  /** Shift a pending item with the most recent logged item, if it's close enough after it. */
+  const follow = (item: TimelineItem) => {
+    if (!anchor) return;
+    const since = item.scheduled - anchor.scheduled;
+    const drift = Math.max(-MAX_EARLIER, anchor.actual - anchor.scheduled);
+    if (since < 0 || since > FOLLOW_WINDOW || Math.abs(drift) < 5) return;
+    item.planned = item.scheduled + drift;
+    item.reason = `${anchor.label} ${hoursText(Math.abs(anchor.actual - anchor.scheduled))} ${drift < 0 ? 'earlier' : 'later'}`;
+  };
+
+  // Safety rules: the latest lower bound wins. `fromLog` marks bounds based only on logged times.
+  let floor: { at: number; why: string } | null = null;
+  let loggedFloor: number | null = null;
+  const atLeast = (at: number, why: string, fromLog: boolean) => {
+    if (!floor || at > floor.at) floor = { at, why };
+    if (fromLog && (loggedFloor === null || at > loggedFloor)) loggedFloor = at;
+  };
+  const applyFloor = (item: TimelineItem) => {
+    const f = floor as { at: number; why: string } | null;
+    if (f && f.at > item.planned) {
+      item.planned = round5(f.at);
+      item.reason = f.why;
     }
+    floor = null;
   };
 
   for (const item of items) {
+    floor = null;
+    loggedFloor = null;
+
     if (item.kind === 'routine') {
       if (item.entry?.status === 'skipped') continue;
       const done = item.entry?.status === 'done';
-      if (done) item.planned = toMinutes(item.entry!.at);
-
-      if (item.event === 'wake') {
-        if (done) wakeShift = Math.max(0, item.planned - item.scheduled);
-        continue;
-      }
-      if (!done) {
-        if (wakeShift && inMorning(item.scheduled)) push(item, item.scheduled + wakeShift, `You woke up ${hoursText(wakeShift)} later`);
+      if (done) {
+        item.planned = toMinutes(item.entry!.at);
+        anchor = {
+          scheduled: item.scheduled,
+          actual: item.planned,
+          label: item.event === 'wake' ? 'You woke up' : `${ROUTINE_LABEL[item.event]} was`,
+        };
+      } else {
+        if (item.event === 'wake') continue;
+        follow(item);
         if (lastMeal) {
           const gap = Math.min(item.scheduled - lastMeal.scheduled, 180);
-          push(item, lastMeal.time + gap, `${hoursText(gap)} after ${ROUTINE_LABEL[lastMeal.event].toLowerCase()}`);
+          atLeast(lastMeal.time + gap, `${hoursText(gap)} after ${ROUTINE_LABEL[lastMeal.event].toLowerCase()}`, false);
         }
-        if (lastEmptyDose) push(item, lastEmptyDose.time + 60, `1 hour after ${shortName(lastEmptyDose.med.name)}${lastEmptyDose.waiting ? ' (not taken yet)' : ''}`);
+        if (lastEmptyDose) {
+          atLeast(
+            lastEmptyDose.time + 60,
+            `1 hour after ${shortName(lastEmptyDose.med.name)}${lastEmptyDose.waiting ? ' (not taken yet)' : ''}`,
+            false,
+          );
+        }
+        applyFloor(item);
       }
+      if (item.event === 'wake') continue;
       lastMeal = { event: item.event, scheduled: item.scheduled, time: item.planned, logged: done };
       mealTimes.set(item.event, item.planned);
       continue;
@@ -454,36 +498,52 @@ export function planTimeline(
     if (d.entry?.status === 'skipped') continue;
     if (d.takenAt !== null) {
       d.planned = d.takenAt;
+      anchor = { scheduled: d.scheduled, actual: d.planned, label: `${shortName(d.med.name)} was taken` };
     } else {
-      if (wakeShift && inMorning(d.scheduled)) push(d, d.scheduled + wakeShift, `You woke up ${hoursText(wakeShift)} later`);
-      for (const e of doseEvents) {
-        const name = shortName(e.med.name) + (e.waiting ? ' (not taken yet)' : '');
-        if (e.med.id === d.med.id) {
-          push(d, e.time + (d.scheduled - e.scheduled) - 60, `Keeps about ${Math.round((d.scheduled - e.scheduled) / 60)} hours after your last dose${e.waiting ? ' (not taken yet)' : ''}`);
-          continue;
-        }
-        const gap = Math.max(d.med.spacingHours ?? 0, e.med.spacingHours ?? 0) * 60;
-        if (gap > 0) push(d, e.time + gap, `${gap / 60} hours after ${name}`);
-        if (d.med.foodRule === 'empty_stomach' && e.med.foodRule === 'with_food') push(d, e.time + 120, `2 hours after ${name} and food`);
-        if (d.med.foodRule === 'with_food' && e.med.foodRule === 'empty_stomach') push(d, e.time + 60, `1 hour after ${name} (empty stomach)`);
-      }
-      if (d.med.foodRule === 'empty_stomach' && lastMeal?.logged) {
-        push(d, lastMeal.time + 120, `2 hours after ${ROUTINE_LABEL[lastMeal.event].toLowerCase()}`);
-      }
+      follow(d);
       if (d.med.foodRule === 'with_food' && routine) {
-        // Line up with the meal scheduled closest to this dose (within 90 minutes).
+        // Line up with the meal scheduled closest to this dose (within 90 minutes), early or late.
         const meal = MEALS.map((m) => ({ m, diff: Math.abs(routine[m] - d.scheduled) }))
           .filter((x) => x.diff <= 90)
           .sort((a, b) => a.diff - b.diff)[0]?.m;
         const mealTime = meal ? mealTimes.get(meal) : undefined;
-        if (meal && mealTime !== undefined) push(d, mealTime, `With ${ROUTINE_LABEL[meal].toLowerCase()}`);
+        if (meal && mealTime !== undefined && mealTime !== d.planned) {
+          d.planned = mealTime;
+          d.reason = mealTime === d.scheduled ? null : `With ${ROUTINE_LABEL[meal].toLowerCase()}`;
+        }
       }
+      for (const e of doseEvents) {
+        const name = shortName(e.med.name) + (e.waiting ? ' (not taken yet)' : '');
+        if (e.med.id === d.med.id) {
+          atLeast(
+            e.time + (d.scheduled - e.scheduled) - 60,
+            `Keeps about ${Math.round((d.scheduled - e.scheduled) / 60)} hours after your last dose${e.waiting ? ' (not taken yet)' : ''}`,
+            e.logged,
+          );
+          continue;
+        }
+        const gap = Math.max(d.med.spacingHours ?? 0, e.med.spacingHours ?? 0) * 60;
+        if (gap > 0) atLeast(e.time + gap, `${gap / 60} hours after ${name}`, e.logged);
+        if (d.med.foodRule === 'empty_stomach' && e.med.foodRule === 'with_food') {
+          atLeast(e.time + 120, `2 hours after ${name} and food`, e.logged);
+        }
+        if (d.med.foodRule === 'with_food' && e.med.foodRule === 'empty_stomach') {
+          atLeast(e.time + 60, `1 hour after ${name} (empty stomach)`, e.logged);
+        }
+      }
+      if (d.med.foodRule === 'empty_stomach' && lastMeal?.logged) {
+        atLeast(lastMeal.time + 120, `2 hours after ${ROUTINE_LABEL[lastMeal.event].toLowerCase()}`, true);
+      }
+      const lf = loggedFloor as number | null;
+      d.earliest = lf === null ? null : round5(lf);
+      applyFloor(d);
     }
     // An overdue dose that isn't logged yet will be taken now at the earliest.
     const waiting = d.takenAt === null && d.planned < nowMinutes;
     const time = waiting ? nowMinutes : d.planned;
-    doseEvents.push({ med: d.med, scheduled: d.scheduled, time, waiting });
-    if (d.med.foodRule === 'empty_stomach') lastEmptyDose = { med: d.med, time, waiting };
+    const logged = d.takenAt !== null;
+    doseEvents.push({ med: d.med, scheduled: d.scheduled, time, waiting, logged });
+    if (d.med.foodRule === 'empty_stomach') lastEmptyDose = { med: d.med, time, waiting, logged };
   }
   return items;
 }

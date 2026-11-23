@@ -262,11 +262,26 @@ function TodaysDoses({
                 Moved from {formatMinutes(item.scheduled)} · {item.reason}
               </ThemedText>
             )}
+            {!entry && item.earliest != null && item.earliest < item.planned && (
+              <ThemedText type="small" style={{ color: theme.accent }}>
+                OK to take any time from {formatPlanMinutes(item.earliest)}
+              </ThemedText>
+            )}
             {!entry && med.foodRule === 'empty_stomach' && (
               <ThemedText type="small" themeColor="textSecondary">
-                {item.planned - 120 <= nowMinutes
-                  ? `Eat next after ${formatPlanMinutes(item.planned + 60)}`
-                  : `No food ${formatPlanMinutes(item.planned - 120)} – ${formatPlanMinutes(item.planned + 60)}`}
+                {(() => {
+                  // A meal you logged in the 2 hours before this dose's window sets the food rule.
+                  const ate = items
+                    .filter((i) => i.kind === 'routine' && i.entry?.status === 'done' && i.planned <= item.planned)
+                    .map((i) => i.planned)
+                    .sort((a, b) => b - a)[0];
+                  if (ate !== undefined && ate > item.planned - 180) {
+                    return `You ate at ${formatPlanMinutes(ate)}. After you take it, wait 1 hour before eating.`;
+                  }
+                  return item.planned - 120 <= nowMinutes
+                    ? `Eat next after ${formatPlanMinutes(item.planned + 60)}`
+                    : `No food ${formatPlanMinutes(item.planned - 120)} – ${formatPlanMinutes(item.planned + 60)}`;
+                })()}
               </ThemedText>
             )}
 

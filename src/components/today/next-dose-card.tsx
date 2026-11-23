@@ -129,6 +129,11 @@ export function NextDoseCard() {
               <ThemedText type="small" style={{ color: next.planned <= nowMinutes ? theme.sunAlert : theme.textSecondary }}>
                 {formatPlanMinutes(next.planned)} · {relative(next.planned - nowMinutes)}
               </ThemedText>
+              {next.earliest != null && next.earliest < next.planned && next.planned > nowMinutes && (
+                <ThemedText type="small" style={{ color: theme.accent }}>
+                  OK to take from {formatPlanMinutes(next.earliest)}
+                </ThemedText>
+              )}
               <ThemedText type="small" themeColor="textSecondary">
                 {next.med.pillsPerDose} pill{next.med.pillsPerDose === 1 ? '' : 's'} · {FOOD_RULE_HINT[next.med.foodRule]}
               </ThemedText>
