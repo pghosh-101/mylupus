@@ -1,14 +1,15 @@
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { Linking, Platform, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Linking, Platform, StyleSheet, Switch, View } from 'react-native';
 
 import { ActionButton, Field, FormSheet, Input, Segmented, TimeStepper } from '@/components/meds/controls';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { describeBackup, exportData, pickBackup, restoreBackup, type Backup } from '@/lib/backup';
 import { select } from '@/lib/haptics';
 import { getNotificationPermission, requestNotificationPermission, type PermissionState } from '@/lib/notifications';
 import { applyReminderSettings } from '@/lib/reminders';
-import { saveSettings, Settings, type AppSettings } from '@/lib/settings';
+import { loadSettings, saveSettings, Settings, type AppSettings } from '@/lib/settings';
 
 type Notify = AppSettings['notify'];
 
@@ -61,6 +62,49 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       const { status } = await Location.requestForegroundPermissionsAsync();
       setLocPerm(status as PermissionState);
     }
+  };
+
+  const [dataNote, setDataNote] = useState<string | null>(null);
+
+  const doExport = async () => {
+    setDataNote(null);
+    try {
+      const summary = await exportData();
+      setDataNote(`Backup ready: ${summary}.`);
+    } catch (e) {
+      setDataNote(e instanceof Error ? e.message : 'Couldn’t create the backup.');
+    }
+  };
+
+  const doRestore = async () => {
+    setDataNote(null);
+    let backup: Backup | null;
+    try {
+      backup = await pickBackup();
+    } catch (e) {
+      setDataNote(e instanceof Error ? e.message : 'Couldn’t read that file.');
+      return;
+    }
+    if (!backup) return;
+    const b = backup;
+    const when = b.exportedAt ? new Date(b.exportedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'an earlier date';
+    const go = async () => {
+      await restoreBackup(b);
+      await loadSettings();
+      applyReminderSettings().catch(() => {});
+      onClose();
+      // Re-render the whole app with the restored data.
+      await saveSettings({});
+    };
+    const message = `This replaces everything in MyLupus on this phone with the backup from ${when} (${describeBackup(b)}).`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Restore this backup? ${message}`)) await go();
+      return;
+    }
+    Alert.alert('Restore this backup?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Restore', style: 'destructive', onPress: go },
+    ]);
   };
 
   const save = async () => {
@@ -154,6 +198,17 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
           value={appearance}
           onChange={setAppearance}
         />
+      </Field>
+      <Field
+        label="Your data"
+        hint="Everything stays on this phone. Export saves your medications, logs, flares, labs, history, chats, and settings to one file you keep, for example in Files or iCloud Drive. If you get a new phone or reinstall Expo Go, restore it here.">
+        <ActionButton label="Export my data" kind="secondary" onPress={doExport} />
+        <ActionButton label="Restore from a backup" kind="secondary" onPress={doRestore} />
+        {dataNote ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {dataNote}
+          </ThemedText>
+        ) : null}
       </Field>
       <Field label="Welcome screens">
         <ThemedText type="small" themeColor="textSecondary">
