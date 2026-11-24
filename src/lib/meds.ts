@@ -562,6 +562,38 @@ export function planDay(
   );
 }
 
+export type MissedDose = PlannedDose & { date: string; dueAt: number };
+
+/**
+ * Doses from earlier days that were due but never logged as taken or skipped, newest first.
+ * Looks back `daysBack` days, and only at days you used the app (logged a dose or routine event),
+ * so days before you started tracking don't show up. A late dose that moved past midnight counts
+ * once its time has passed.
+ */
+export function findMissedDoses(
+  meds: Medication[],
+  log: DoseLogEntry[],
+  routine: Routine | undefined,
+  routineLog: RoutineLogEntry[],
+  now = Date.now(),
+  daysBack = 2,
+): MissedDose[] {
+  const out: MissedDose[] = [];
+  for (let back = 1; back <= daysBack; back++) {
+    const day = new Date(now);
+    day.setDate(day.getDate() - back);
+    const date = todayString(day);
+    const used = log.some((e) => e.key.startsWith(`${date}|`)) || routineLog.some((e) => e.key.startsWith(`${date}|`));
+    if (!used) continue;
+    const midnight = parseDate(date).getTime();
+    for (const d of planDay(meds, log, date, routine, routineLog, now)) {
+      const dueAt = midnight + d.planned * 60000;
+      if (!d.entry && dueAt <= now) out.push({ ...d, date, dueAt });
+    }
+  }
+  return out.sort((a, b) => b.dueAt - a.dueAt);
+}
+
 // ---------------------------------------------------------------------------
 // Notifications
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { Card, Screen } from '@/components/screen';
 import { SettingsSheet } from '@/components/settings-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { HeadsUpCard } from '@/components/today/heads-up-card';
+import { MissedDoses } from '@/components/meds/missed-doses';
 import { NextDoseCard } from '@/components/today/next-dose-card';
 import { UvCard } from '@/components/uv-card';
 import { useTheme } from '@/hooks/use-theme';
@@ -41,6 +42,7 @@ export default function TodayScreen() {
           </ThemedText>
         </View>
       )}
+      <MissedDoses />
       <NextDoseCard />
       <CheckinCard compact />
       <HeadsUpCard />

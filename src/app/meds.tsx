@@ -6,6 +6,7 @@ import { tap } from '@/lib/haptics';
 import { CardHeader } from '@/components/card-header';
 import { ActionButton } from '@/components/meds/controls';
 import { MedForm } from '@/components/meds/med-form';
+import { MissedDoses } from '@/components/meds/missed-doses';
 import { RoutineForm } from '@/components/meds/routine-form';
 import { TakenSheet } from '@/components/meds/taken-sheet';
 import { Card, Screen } from '@/components/screen';
@@ -85,6 +86,7 @@ export default function MedsScreen() {
 
   return (
     <Screen title="Medications">
+      <MissedDoses onChanged={reload} />
       <TodaysDoses meds={meds} log={log} routine={routine} routineLog={routineLog} onChange={reload} />
 
       {meds.map((med) => (

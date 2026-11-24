@@ -11,6 +11,7 @@ import { parseDate, type Minutes } from '@/lib/meds';
 export function TakenSheet({
   prompt,
   date,
+  initialMinutes,
   onConfirm,
   onClose,
 }: {
@@ -18,6 +19,8 @@ export function TakenSheet({
   prompt: string | null;
   /** The plan's day, "YYYY-MM-DD". */
   date: string;
+  /** Start the time picker here (minutes from midnight) instead of now, e.g. a missed dose's time. */
+  initialMinutes?: Minutes;
   onConfirm: (takenAt: number) => void;
   onClose: () => void;
 }) {
@@ -31,10 +34,10 @@ export function TakenSheet({
 
   useEffect(() => {
     if (prompt) {
-      setTime(nowMinutes());
-      setQuick(0);
+      setTime(initialMinutes !== undefined ? Math.round((((initialMinutes % 1440) + 1440) % 1440) / 5) * 5 : nowMinutes());
+      setQuick(initialMinutes !== undefined ? -1 : 0);
     }
-  }, [prompt]);
+  }, [prompt, initialMinutes]);
 
   const pickQuick = (minutesAgo: number) => {
     setQuick(minutesAgo);
