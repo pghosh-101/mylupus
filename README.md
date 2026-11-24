@@ -31,11 +31,11 @@ Lupus looks different for everyone, and the information that matters most (your 
 
 ## Features
 
-**Sun protection.** Live UV for your location, an hourly forecast, a personal UV limit, an 8 AM notification with today's peak and the hours above your limit, and sunscreen reapply reminders that only fire if UV is still high.
+**Sun protection.** Live UV for your location, an hourly forecast, a personal UV limit, an 8 AM notification with today's peak and the hours above your limit, and sunscreen reapply reminders that only fire if UV is still high. Mark "Staying in today" (or a past day as stayed inside) so indoor days don't count as days without sunscreen.
 
-**Medications that adapt to your day.** Food rules (with food / empty stomach), spacing between medications, and a daily routine (wake, meals, bed). Log when you actually woke up, ate, or took a dose, and the rest of the day re-plans itself: later doses and meals shift to keep the right gaps, and reminders follow. Refill reminders before you run out.
+**Medications that adapt to your day.** Food rules (with food / empty stomach), spacing between medications, and a daily routine (wake, meals, bed). Log when you actually woke up, ate, or took a dose, and the rest of the day re-plans itself in either direction: items in the next few hours shift to keep your usual gaps (earlier by up to an hour), safety rules always win, and each dose shows the earliest time it's OK to take. Reminders repeat at 1 and 2 hours until a dose is logged, and later doses wait for the one before. A "Missed doses" list catches unlogged doses from the last two days, such as a late dose that rolled past midnight. Refill reminders before you run out.
 
-**Daily log.** A 30-second morning sleep check-in and evening check-in (symptoms, stress, meals, notes), a month calendar colored by how each day went, a flare history (including past flares), Raynaud's episodes with the outdoor temperature, and a weekly pattern report computed on the device.
+**Daily log.** A 30-second morning sleep check-in and evening check-in (symptoms, stress, meals, notes, plus symptoms you add yourself), a month calendar colored by how each day went, Raynaud's episodes with the outdoor temperature, and a weekly pattern report computed on the device that compares against what was actually due so far ("On track", "A little behind"). One "Update history" sheet logs current or past flares (with rough lengths like "about a week") and your health background, and "View history" shows them as an expandable timeline by year.
 
 **Labs.** Scan a lab report photo or type results in. Charts over time with normal ranges, change since the last test, and doctor's notes (for example, "this level is OK for me," which turns off warnings while still flagging a real worsening).
 
@@ -52,6 +52,7 @@ Lupus looks different for everyone, and the information that matters most (your 
 ## Privacy and security
 
 - All health data is stored **on the device**. Nothing is uploaded except a lab photo you choose to scan or a question you choose to ask.
+- **Export my data** saves everything to one JSON file through the share sheet (Files, iCloud Drive), and **Restore from a backup** loads it back, so a new phone or reinstall doesn't lose your history. The file only goes where you choose to save it.
 - API keys live in a local `.env.local` file that is **never committed**, and every `.env` variant is git-ignored.
 - The **public demo** is built with `EXPO_PUBLIC_DEMO=1` and with `.env` loading disabled, and the build script scans the output and refuses to publish if anything key-like is found. Demo AI answers are pre-written, so the demo makes no API calls.
 
