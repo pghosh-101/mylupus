@@ -4,10 +4,10 @@ import { Platform } from 'react-native';
 
 import { success } from '@/lib/haptics';
 import type { Place } from '@/lib/location';
-import { loadDoseLog, loadMeds, todayString } from '@/lib/meds';
+import { doseKey, loadDoseLog, loadMeds, todayString } from '@/lib/meds';
 import { getNotificationPermission, remindersOn } from '@/lib/notifications';
 import { Settings } from '@/lib/settings';
-import { loadSunscreenLog } from '@/lib/sunscreen';
+import { loadSunscreenLog, stayedInDays, sunscreenDays } from '@/lib/sunscreen';
 import { fetchTodayWeather, type DayWeather } from '@/lib/uv';
 
 // ---------------------------------------------------------------------------
@@ -387,32 +387,79 @@ export async function weeklyInsights(): Promise<Insight[]> {
     }
   }
 
-  // Medications
+  // Medications: compare with the doses due so far, not a full week's worth.
   if (meds.length) {
-    const weekSet = new Set(week);
-    const scheduled = meds.reduce((n, m) => n + m.doseTimes.length, 0) * 7;
-    const taken = doseLog.filter((e) => e.status === 'taken' && weekSet.has(e.key.split('|')[0])).length;
-    if (taken > 0) {
-      const share = taken / scheduled;
-      out.push({
-        tone: share >= 0.9 ? 'good' : 'focus',
-        title: share >= 0.9 ? 'Great medication consistency' : 'Some doses missed',
-        detail: `Logged ${taken} of ${scheduled} doses this week.`,
-      });
+    // Count from the first day you logged a dose, so days before you started tracking don't count.
+    const loggedDates = doseLog.map((e) => e.key.split('|')[0]).filter((d) => week.includes(d));
+    const firstTracked = loggedDates.sort()[0];
+    if (firstTracked) {
+      const now = new Date();
+      const today = todayString(now);
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const byKey = new Map(doseLog.map((e) => [e.key, e.status]));
+      let due = 0;
+      let taken = 0;
+      let skipped = 0;
+      for (const date of week.filter((d) => d >= firstTracked)) {
+        for (const med of meds) {
+          med.doseTimes.forEach((t, i) => {
+            const status = byKey.get(doseKey(date, med.id, i));
+            // Today's doses count once logged, or 2 hours after their time (the reminder window).
+            if (date === today && !status && t + 120 > nowMinutes) return;
+            due++;
+            if (status === 'taken') taken++;
+            if (status === 'skipped') skipped++;
+          });
+        }
+      }
+      const missing = due - taken - skipped;
+      const since = firstTracked > week[0] ? ` since you started on ${formatShortDate(firstTracked)}` : ' this week';
+      const skippedText = skipped ? ` Skipped ${skipped}.` : '';
+      if (due > 0) {
+        out.push(
+          missing === 0
+            ? {
+                tone: 'good',
+                title: 'On track with medications',
+                detail: `Taken ${taken} of ${due} doses due so far${since}.${skippedText}`,
+              }
+            : {
+                tone: 'focus',
+                title: missing <= 2 ? 'A little behind on medications' : 'Behind on medications',
+                detail: `Taken ${taken} of ${due} doses due so far${since}.${skippedText} ${missing} ${missing === 1 ? 'isn’t' : 'aren’t'} logged yet. If you took ${missing === 1 ? 'it' : 'them'}, log ${missing === 1 ? 'it' : 'them'} on the Meds tab.`,
+              },
+        );
+      }
     }
   }
 
-  // Sunscreen on high-UV days
+  // Sunscreen on high-UV days: days you stayed inside don't count against you.
   const highUv = week.filter((d) => (weather[d]?.uvMax ?? 0) > Settings.uvThreshold);
   if (highUv.length) {
-    const covered = highUv.filter((d) =>
-      sunscreen.some((e) => e.type === 'applied' && todayString(new Date(e.at)) === d),
-    ).length;
-    out.push({
-      tone: covered === highUv.length ? 'good' : 'focus',
-      title: 'Sunscreen on high-UV days',
-      detail: `Logged sunscreen on ${covered} of ${highUv.length} days when UV went above ${Settings.uvThreshold}.`,
-    });
+    const applied = sunscreenDays(sunscreen);
+    const stayedIn = stayedInDays(sunscreen);
+    const today = todayString();
+    const covered = highUv.filter((d) => applied.has(d)).length;
+    const inside = highUv.filter((d) => !applied.has(d) && stayedIn.has(d)).length;
+    // Today isn't counted as "not logged" until it's over.
+    const unlogged = highUv.filter((d) => !applied.has(d) && !stayedIn.has(d) && d !== today);
+    const parts = [
+      covered ? `sunscreen on ${covered}` : '',
+      inside ? `stayed inside on ${inside}` : '',
+      unlogged.length ? `nothing logged on ${unlogged.length}` : '',
+    ].filter(Boolean);
+    if (parts.length) {
+      const summary = parts.join(', ');
+      out.push({
+        tone: unlogged.length ? 'info' : 'good',
+        title: unlogged.length ? 'Sunscreen on high-UV days' : 'Protected on every high-UV day',
+        detail:
+          `UV went above ${Settings.uvThreshold} on ${highUv.length} day${highUv.length === 1 ? '' : 's'}: ${summary}.` +
+          (unlogged.length
+            ? ` If you stayed in on ${unlogged.length === 1 ? 'that day' : 'those days'} (${unlogged.map(formatShortDate).join(', ')}), tap the day on the calendar and choose Stayed inside.`
+            : ''),
+      });
+    }
   }
 
   // Raynaud's
@@ -430,6 +477,12 @@ export async function weeklyInsights(): Promise<Insight[]> {
   }
 
   return out;
+}
+
+/** "Nov 22" from "2026-11-22". */
+function formatShortDate(date: string) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 /** Warning signs that should prompt a call to the doctor, from an evening check-in. */

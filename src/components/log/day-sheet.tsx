@@ -23,6 +23,9 @@ import {
   type SleepEntry,
 } from '@/lib/daily';
 import { loadDoseLog, loadMeds, parseDate, shortName, todayString } from '@/lib/meds';
+import { Settings } from '@/lib/settings';
+import { loadSunscreenLog, setStayedIn, stayedInDays } from '@/lib/sunscreen';
+import { formatTime } from '@/lib/uv';
 import type { DayWeather } from '@/lib/uv';
 
 /** One day: everything logged, with buttons to fill in or edit its check-ins. */
@@ -47,12 +50,22 @@ export function DaySheet({
   const [weather, setWeather] = useState<DayWeather | null>(null);
   const [raynaud, setRaynaud] = useState<RaynaudEvent[]>([]);
   const [raynaudTick, setRaynaudTick] = useState(0);
+  const [sunscreenTimes, setSunscreenTimes] = useState<number[]>([]);
+  const [stayedIn, setStayedInState] = useState(false);
 
   useEffect(() => {
     if (!date) return;
     (async () => {
-      const [meds, log, w, r] = await Promise.all([loadMeds(), loadDoseLog(), loadWeatherLog(), loadRaynaud()]);
+      const [meds, log, w, r, sun] = await Promise.all([
+        loadMeds(),
+        loadDoseLog(),
+        loadWeatherLog(),
+        loadRaynaud(),
+        loadSunscreenLog(),
+      ]);
       setRaynaud(r.filter((e) => todayString(new Date(e.at)) === date));
+      setSunscreenTimes(sun.filter((e) => e.type === 'applied' && todayString(new Date(e.at)) === date).map((e) => e.at));
+      setStayedInState(stayedInDays(sun).has(date));
       setDoses(
         log
           .filter((e) => e.key.startsWith(`${date}|`))
@@ -136,6 +149,35 @@ export function DaySheet({
                   onChanged();
                 }}
               />
+            </Card>
+          )}
+
+          {(sunscreenTimes.length > 0 || stayedIn || (weather?.uvMax ?? 0) > Settings.uvThreshold) && (
+            <Card>
+              <CardHeader icon="sun.max.fill" title="SUNSCREEN" />
+              <ThemedText>
+                {sunscreenTimes.length
+                  ? `Put on at ${sunscreenTimes.map((t) => formatTime(new Date(t))).join(', ')}`
+                  : stayedIn
+                    ? 'Stayed inside'
+                    : 'Nothing logged'}
+              </ThemedText>
+              {weather?.uvMax != null && weather.uvMax > Settings.uvThreshold && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  UV went up to {weather.uvMax}, above your limit of {Settings.uvThreshold}.
+                </ThemedText>
+              )}
+              {sunscreenTimes.length === 0 && (
+                <ActionButton
+                  label={stayedIn ? 'Undo stayed inside' : 'I stayed inside'}
+                  kind="secondary"
+                  onPress={async () => {
+                    await setStayedIn(date, !stayedIn);
+                    setStayedInState(!stayedIn);
+                    onChanged();
+                  }}
+                />
+              )}
             </Card>
           )}
 

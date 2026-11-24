@@ -34,7 +34,7 @@ import {
   todayString,
 } from '@/lib/meds';
 import { Settings } from '@/lib/settings';
-import { loadSunscreenLog } from '@/lib/sunscreen';
+import { loadSunscreenLog, stayedInDays } from '@/lib/sunscreen';
 
 /**
  * The chat assistant answers questions that need reasoning over the user's history,
@@ -264,6 +264,8 @@ export async function buildContext(): Promise<string> {
   section(`Sun and weather since ${since}`);
   const applied = sunscreen.filter((e) => e.type === 'applied' && todayString(new Date(e.at)) >= since);
   out.push(`Sunscreen logged ${applied.length} times.`);
+  const inside = [...stayedInDays(sunscreen)].filter((d) => d >= since).sort();
+  if (inside.length) out.push(`Days the user marked as staying inside: ${inside.join(', ')}.`);
   const highUvDays = days.filter((d) => (weather[d]?.uvMax ?? 0) > Settings.uvThreshold);
   out.push(`Days with max UV above ${Settings.uvThreshold}: ${highUvDays.length ? highUvDays.join(', ') : 'none recorded'}.`);
   const weatherDays = days.filter((d) => weather[d]);

@@ -9,10 +9,14 @@ import type { Place } from '@/lib/location';
 import {
   applySunscreen,
   backInside,
+  loadSunscreenLog,
   loadSunscreenState,
   REAPPLY_MS,
+  setStayedIn,
+  stayedInDays,
   type SunscreenState,
 } from '@/lib/sunscreen';
+import { todayString } from '@/lib/meds';
 import { formatTime } from '@/lib/uv';
 
 /** "I put on sunscreen" / "I'm back inside" controls inside the UV card. */
@@ -21,11 +25,20 @@ export function SunscreenRow({ place, needsProtection }: { place: Place; needsPr
   const [state, setState] = useState<SunscreenState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stayingIn, setStayingIn] = useState(false);
 
   useEffect(() => {
     // Ignore state saved by an older version of the app.
     loadSunscreenState().then((s) => setState(s && 'notified' in s ? s : null));
+    loadSunscreenLog().then((log) => setStayingIn(stayedInDays(log).has(todayString())));
   }, []);
+
+  const toggleStayingIn = useCallback(async () => {
+    const next = !stayingIn;
+    await setStayedIn(todayString(), next);
+    setStayingIn(next);
+    setMessage(null);
+  }, [stayingIn]);
 
   const apply = useCallback(async () => {
     setBusy(true);
@@ -78,9 +91,15 @@ export function SunscreenRow({ place, needsProtection }: { place: Place; needsPr
               label="I put on sunscreen"
               onPress={apply}
               disabled={busy}
-              primary={needsProtection}
+              primary={needsProtection && !stayingIn}
             />
+            <Button label={stayingIn ? '✓ Staying in today' : 'Staying in today'} onPress={toggleStayingIn} disabled={busy} />
           </View>
+          {stayingIn && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Marked as an indoor day. Tap again to undo. If you head out, tap I put on sunscreen.
+            </ThemedText>
+          )}
         </>
       )}
       {message && (

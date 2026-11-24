@@ -23,8 +23,12 @@ export type SunscreenState = {
   notified: boolean;
 };
 
-/** History of sunscreen events, kept for pattern-finding later. */
-export type SunscreenEvent = { type: 'applied' | 'inside'; at: number };
+/**
+ * History of sunscreen events, kept for pattern-finding. 'inside' ends an outing; 'stayed_in'
+ * marks a whole day spent indoors (`date`), so a high-UV day without sunscreen isn't counted
+ * against you.
+ */
+export type SunscreenEvent = { type: 'applied' | 'inside' | 'stayed_in'; at: number; date?: string };
 
 export async function loadSunscreenState(): Promise<SunscreenState | null> {
   try {
@@ -148,6 +152,32 @@ export async function applySunscreen(place: Place): Promise<{ state: SunscreenSt
   };
   await saveState(state);
   return { state, message };
+}
+
+const localDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Days marked as spent indoors ("YYYY-MM-DD"). */
+export function stayedInDays(log: SunscreenEvent[]): Set<string> {
+  return new Set(log.filter((e) => e.type === 'stayed_in').map((e) => e.date ?? localDay(new Date(e.at))));
+}
+
+/** Days with sunscreen logged ("YYYY-MM-DD"). */
+export function sunscreenDays(log: SunscreenEvent[]): Set<string> {
+  return new Set(log.filter((e) => e.type === 'applied').map((e) => localDay(new Date(e.at))));
+}
+
+/** Mark a day (default today) as spent indoors, or clear that mark. */
+export async function setStayedIn(date: string, stayedIn: boolean): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(LOG_KEY);
+    const log: SunscreenEvent[] = raw ? JSON.parse(raw) : [];
+    const rest = log.filter((e) => !(e.type === 'stayed_in' && (e.date ?? localDay(new Date(e.at))) === date));
+    if (stayedIn) rest.push({ type: 'stayed_in', at: Date.now(), date });
+    await AsyncStorage.setItem(LOG_KEY, JSON.stringify(rest.slice(-2000)));
+  } catch {
+    // Not fatal.
+  }
 }
 
 /** Cancel the reapply reminder because you're back indoors. */
