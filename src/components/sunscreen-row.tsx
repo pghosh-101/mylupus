@@ -19,7 +19,10 @@ import {
 import { todayString } from '@/lib/meds';
 import { formatTime } from '@/lib/uv';
 
-/** "I put on sunscreen" / "I'm back inside" controls inside the UV card. */
+/**
+ * "I put on sunscreen" / "Staying in today" / "I'm back inside" controls inside the UV card.
+ * Shown only while UV is above the limit, or while an outing is running.
+ */
 export function SunscreenRow({ place, needsProtection }: { place: Place; needsProtection: boolean }) {
   const theme = useTheme();
   const [state, setState] = useState<SunscreenState | null>(null);
@@ -59,6 +62,10 @@ export function SunscreenRow({ place, needsProtection }: { place: Place; needsPr
 
   // An outing is "active" until 2 hours after the last application.
   const active = state && Date.now() < state.appliedAt + REAPPLY_MS;
+
+  // Only offer the buttons while UV is above the limit. An outing that's already running stays
+  // visible, so you can still log a reapply or say you're back inside after UV drops.
+  if (!active && !needsProtection) return null;
 
   return (
     <View style={[styles.box, { borderColor: theme.backgroundSelected }]}>
