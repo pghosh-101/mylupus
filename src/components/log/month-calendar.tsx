@@ -47,11 +47,14 @@ export function MonthCalendar({
   sleep,
   evening,
   flares,
+  missedDays,
   onPickDay,
 }: {
   sleep: Record<string, SleepEntry>;
   evening: Record<string, EveningEntry>;
   flares: Flare[];
+  /** Days with a dose that was never logged. */
+  missedDays?: Set<string>;
   onPickDay: (date: string) => void;
 }) {
   const theme = useTheme();
@@ -113,7 +116,7 @@ export function MonthCalendar({
               <Pressable
                 disabled={future}
                 onPress={() => onPickDay(date)}
-                accessibilityLabel={`${date}${level !== null ? `, ${LEVEL_NAMES[level]}` : logged ? ', logged' : ''}${flareDays.has(date) ? ', flare' : ''}`}
+                accessibilityLabel={`${date}${level !== null ? `, ${LEVEL_NAMES[level]}` : logged ? ', logged' : ''}${flareDays.has(date) ? ', flare' : ''}${missedDays?.has(date) ? ', missed dose' : ''}`}
                 style={({ pressed }) => [
                   styles.day,
                   {
@@ -125,6 +128,11 @@ export function MonthCalendar({
                 <ThemedText type="small" style={{ color: solid ? readableOn(solid) : theme.text, fontWeight: '600' }}>
                   {day}
                 </ThemedText>
+                {missedDays?.has(date) && (
+                  <View style={[styles.missedMark, { backgroundColor: theme.backgroundElement, borderColor: theme.sunAlert }]}>
+                    <ThemedText style={[styles.missedText, { color: theme.sunAlert }]}>!</ThemedText>
+                  </View>
+                )}
                 {flareDays.has(date) && <View style={[styles.flareDot, { backgroundColor: theme.sunAlert, borderColor: theme.backgroundElement }]} />}
               </Pressable>
             </View>
@@ -147,9 +155,19 @@ export function MonthCalendar({
             Flare
           </ThemedText>
         </View>
+        {missedDays && missedDays.size > 0 && (
+          <View style={styles.legendItem}>
+            <View style={[styles.missedMark, styles.legendMark, { backgroundColor: theme.backgroundElement, borderColor: theme.sunAlert }]}>
+              <ThemedText style={[styles.missedText, { color: theme.sunAlert }]}>!</ThemedText>
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              Dose not logged
+            </ThemedText>
+          </View>
+        )}
       </View>
       <ThemedText type="small" themeColor="textSecondary">
-        Colors come from your evening check-in (your worst symptom that day). Tap a day to see it or fill it in.
+        Colors come from your evening check-in (your worst symptom that day). Tap a day to see it or fill it in, including doses you forgot to log.
       </ThemedText>
     </Card>
   );
@@ -165,5 +183,18 @@ const styles = StyleSheet.create({
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three, marginTop: Spacing.one },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   swatch: { width: 14, height: 14, borderRadius: 4 },
+  missedMark: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legendMark: { position: 'relative', bottom: 0, right: 0 },
+  missedText: { fontSize: 9, lineHeight: 11, fontWeight: '800' },
   legendDot: { width: 9, height: 9, borderRadius: 5 },
 });

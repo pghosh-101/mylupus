@@ -28,6 +28,7 @@ import {
   type MedicalHistory,
   type SleepEntry,
 } from '@/lib/daily';
+import { findMissedDoses, loadDoseLog, loadMeds, loadRoutine, loadRoutineLog } from '@/lib/meds';
 
 export default function LogScreen() {
   const theme = useTheme();
@@ -39,15 +40,22 @@ export default function LogScreen() {
   const [editing, setEditing] = useState<HistoryEditing | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [pickedDay, setPickedDay] = useState<string | null>(null);
+  const [missedDays, setMissedDays] = useState<Set<string>>(new Set());
 
   const reload = useCallback(async () => {
-    const [i, f, h, s, e] = await Promise.all([
+    const [i, f, h, s, e, meds, log, routine, routineLog] = await Promise.all([
       weeklyInsights(),
       loadFlares(),
       loadHistory(),
       loadSleep(),
       loadEvening(),
+      loadMeds(),
+      loadDoseLog(),
+      loadRoutine(),
+      loadRoutineLog(),
     ]);
+    // Past days with a dose that was never logged get a marker on the calendar.
+    setMissedDays(new Set(findMissedDoses(meds, log, routine, routineLog, Date.now(), 90).map((d) => d.date)));
     setInsights(i);
     setFlares(f);
     setHistory(h);
@@ -93,7 +101,7 @@ export default function LogScreen() {
     <Screen title="Daily log">
       <CheckinCard onSaved={reload} />
 
-      <MonthCalendar sleep={sleep} evening={evening} flares={flares} onPickDay={setPickedDay} />
+      <MonthCalendar sleep={sleep} evening={evening} flares={flares} missedDays={missedDays} onPickDay={setPickedDay} />
 
       <InsightsCard insights={insights} />
 

@@ -44,12 +44,31 @@ export function TakenSheet({
     setTime((((nowMinutes() - minutesAgo) % 1440) + 1440) % 1440);
   };
 
+  const planDayStart = parseDate(date).getTime();
+  /** "Now" and "15 min ago" only make sense for today's plan or a late dose from last night. */
+  const showQuick = Date.now() - planDayStart < 48 * 3600 * 1000;
+  const recent = Date.now() - planDayStart < 24 * 3600 * 1000;
+
   const confirm = () => {
     // A late-night dose logged after midnight belongs to the previous day's plan.
-    let minutes = time;
     const now = new Date();
-    const planDayStart = parseDate(date).getTime();
-    if (now.getTime() - planDayStart >= 24 * 3600 * 1000 && time < 12 * 60) minutes += 1440;
+    if (quick >= 0 && showQuick) {
+      onConfirm(now.getTime() - quick * 60000);
+      return;
+    }
+    let minutes = time;
+    if (initialMinutes !== undefined) {
+      // Editing a known dose (e.g. from the calendar): pick the same day or just after midnight,
+      // whichever is closer to when it was due, without landing in the future.
+      const sameDay = time;
+      const nextDay = time + 1440;
+      const closer = Math.abs(nextDay - initialMinutes) < Math.abs(sameDay - initialMinutes) ? nextDay : sameDay;
+      const other = closer === sameDay ? nextDay : sameDay;
+      const future = (m: number) => planDayStart + m * 60000 > now.getTime();
+      minutes = future(closer) && !future(other) ? other : closer;
+    } else if (now.getTime() - planDayStart >= 24 * 3600 * 1000 && time < 12 * 60) {
+      minutes += 1440;
+    }
     onConfirm(planDayStart + minutes * 60000);
   };
 
@@ -60,6 +79,7 @@ export function TakenSheet({
           {prompt && (
             <>
               <ThemedText type="smallBold">{prompt}</ThemedText>
+              {showQuick && (
               <Segmented
                 options={[
                   { value: 0, label: 'Now' },
@@ -70,6 +90,7 @@ export function TakenSheet({
                 value={quick}
                 onChange={pickQuick}
               />
+              )}
               <View style={styles.center}>
                 <TimeStepper
                   value={time}
@@ -81,7 +102,9 @@ export function TakenSheet({
                 />
               </View>
               <ThemedText type="small" themeColor="textSecondary">
-                The rest of today adjusts to keep the right spacing and food timing.
+                {recent
+                  ? 'The rest of today adjusts to keep the right spacing and food timing.'
+                  : 'If it was after midnight, pick that time: it still counts for this day.'}
               </ThemedText>
               <View style={styles.row}>
                 <View style={styles.flex}>

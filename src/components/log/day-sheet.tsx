@@ -3,6 +3,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CardHeader } from '@/components/card-header';
+import { DayDoses } from '@/components/log/day-doses';
 import { EveningForm } from '@/components/log/evening-form';
 import { RaynaudList } from '@/components/log/raynaud-list';
 import { SleepForm } from '@/components/log/sleep-form';
@@ -22,13 +23,13 @@ import {
   type RaynaudEvent,
   type SleepEntry,
 } from '@/lib/daily';
-import { loadDoseLog, loadMeds, parseDate, shortName, todayString } from '@/lib/meds';
+import { parseDate, todayString } from '@/lib/meds';
 import { Settings } from '@/lib/settings';
 import { loadSunscreenLog, setStayedIn, stayedInDays } from '@/lib/sunscreen';
 import { formatTime } from '@/lib/uv';
 import type { DayWeather } from '@/lib/uv';
 
-/** One day: everything logged, with buttons to fill in or edit its check-ins. */
+/** One day: everything logged, with buttons to fill in or edit its check-ins and doses. */
 export function DaySheet({
   date,
   sleep,
@@ -46,7 +47,6 @@ export function DaySheet({
 }) {
   const theme = useTheme();
   const [form, setForm] = useState<'sleep' | 'evening' | null>(null);
-  const [doses, setDoses] = useState<string[]>([]);
   const [weather, setWeather] = useState<DayWeather | null>(null);
   const [raynaud, setRaynaud] = useState<RaynaudEvent[]>([]);
   const [raynaudTick, setRaynaudTick] = useState(0);
@@ -56,9 +56,7 @@ export function DaySheet({
   useEffect(() => {
     if (!date) return;
     (async () => {
-      const [meds, log, w, r, sun] = await Promise.all([
-        loadMeds(),
-        loadDoseLog(),
+      const [w, r, sun] = await Promise.all([
         loadWeatherLog(),
         loadRaynaud(),
         loadSunscreenLog(),
@@ -66,16 +64,6 @@ export function DaySheet({
       setRaynaud(r.filter((e) => todayString(new Date(e.at)) === date));
       setSunscreenTimes(sun.filter((e) => e.type === 'applied' && todayString(new Date(e.at)) === date).map((e) => e.at));
       setStayedInState(stayedInDays(sun).has(date));
-      setDoses(
-        log
-          .filter((e) => e.key.startsWith(`${date}|`))
-          .map((e) => {
-            const med = meds.find((m) => m.id === e.key.split('|')[1]);
-            const name = med ? shortName(med.name) : 'Medication';
-            const time = new Date(e.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-            return e.status === 'taken' ? `${name} taken at ${time}` : `${name} skipped`;
-          }),
-      );
       setWeather(w[date] ?? null);
     })();
   }, [date, raynaudTick]);
@@ -136,7 +124,7 @@ export function DaySheet({
 
           <Card>
             <CardHeader icon="pills.fill" title="MEDICATIONS" />
-            {doses.length ? doses.map((d) => <ThemedText key={d} type="small">{d}</ThemedText>) : <ThemedText>Nothing logged</ThemedText>}
+            <DayDoses date={date} onChanged={onChanged} />
           </Card>
 
           {raynaud.length > 0 && (
