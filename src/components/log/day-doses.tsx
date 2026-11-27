@@ -119,7 +119,7 @@ export function DayDoses({ date, onChanged }: { date: string; onChanged?: () => 
                   <ActionButton label="Clear" kind="secondary" onPress={() => record(d, null)} />
                 </View>
               </View>
-            ) : missed ? (
+            ) : (
               <View style={styles.row}>
                 <View style={styles.flex}>
                   <ActionButton label="I took it" onPress={() => setAsking(d)} />
@@ -128,7 +128,7 @@ export function DayDoses({ date, onChanged }: { date: string; onChanged?: () => 
                   <ActionButton label="Didn't take it" kind="secondary" onPress={() => record(d, 'skipped')} />
                 </View>
               </View>
-            ) : null}
+            )}
           </View>
         );
       })}

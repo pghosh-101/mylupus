@@ -24,6 +24,8 @@ import {
   loadRoutineLog,
   logDose,
   logRoutine,
+  parseDate,
+  planDay,
   planTimeline,
   rescheduleMedNotifications,
   ROUTINE_LABEL,
@@ -38,6 +40,7 @@ import {
   type DoseLogEntry,
   type Medication,
   type Routine,
+  type PlannedDose,
   type RoutineLogEntry,
   type TimelineItem,
 } from '@/lib/meds';
@@ -85,6 +88,7 @@ export default function MedsScreen() {
 
   return (
     <Screen title="Medications">
+      <LastNightDoses meds={meds} log={log} routine={routine} routineLog={routineLog} onChange={reload} />
       <TodaysDoses meds={meds} log={log} routine={routine} routineLog={routineLog} onChange={reload} />
 
       {meds.map((med) => (
@@ -319,6 +323,74 @@ function TodaysDoses({
           if (item.kind === 'dose') await recordDose(item.key, 'taken', at);
           else await recordRoutine(item.key, 'done', at);
         }}
+      />
+    </Card>
+  );
+}
+
+/**
+ * Yesterday's late doses that weren't logged (including ones pushed past midnight), shown until
+ * noon so they can be marked taken or skipped any time, even before they're due.
+ */
+function LastNightDoses({
+  meds,
+  log,
+  routine,
+  routineLog,
+  onChange,
+}: {
+  meds: Medication[];
+  log: DoseLogEntry[];
+  routine: Routine;
+  routineLog: RoutineLogEntry[];
+  onChange: () => void;
+}) {
+  const theme = useTheme();
+  const [asking, setAsking] = useState<PlannedDose | null>(null);
+  const now = new Date();
+  if (meds.length === 0 || now.getHours() >= 12) return null;
+  const y = new Date(now);
+  y.setDate(y.getDate() - 1);
+  const yesterday = todayString(y);
+  const doses = planDay(meds, log, yesterday, routine, routineLog)
+    .filter((d) => !d.entry && d.planned >= 20 * 60)
+    .sort((a, b) => a.planned - b.planned);
+  if (doses.length === 0) return null;
+
+  const record = async (key: string, status: 'taken' | 'skipped', at?: number) => {
+    setAsking(null);
+    await logDose(key, status, at);
+    onChange();
+    rescheduleMedNotifications().catch(() => {});
+  };
+  const dueAt = (d: PlannedDose) => parseDate(yesterday).getTime() + d.planned * 60000;
+
+  return (
+    <Card>
+      <CardHeader icon="moon.fill" title="LAST NIGHT" />
+      <ThemedText type="small" themeColor="textSecondary">
+        Late doses from yesterday that aren&apos;t logged. Mark them whenever you take them.
+      </ThemedText>
+      {doses.map((d) => (
+        <View key={d.key} style={[styles.dose, { borderColor: theme.backgroundSelected }]}>
+          <ThemedText type="smallBold">
+            {formatPlanMinutes(d.planned)} · {shortName(d.med.name)}
+          </ThemedText>
+          <ThemedText type="small" style={{ color: dueAt(d) <= now.getTime() ? theme.sunAlert : theme.textSecondary }}>
+            {dueAt(d) <= now.getTime() ? 'Not logged' : 'Not due yet'} · {d.med.pillsPerDose} pill
+            {d.med.pillsPerDose === 1 ? '' : 's'} · {FOOD_RULE_HINT[d.med.foodRule]}
+          </ThemedText>
+          <View style={styles.doseButtons}>
+            <SmallButton label="Taken" primary onPress={() => setAsking(d)} />
+            <SmallButton label="Didn't take it" onPress={() => record(d.key, 'skipped')} />
+          </View>
+        </View>
+      ))}
+      <TakenSheet
+        prompt={asking ? `When did you take ${shortName(asking.med.name)}?` : null}
+        date={yesterday}
+        onClose={() => setAsking(null)}
+        onConfirm={(at) => asking && record(asking.key, 'taken', at)}
       />
     </Card>
   );
